@@ -1,1 +1,1 @@
-README completo e profissional
+README atualizado com status das fases
