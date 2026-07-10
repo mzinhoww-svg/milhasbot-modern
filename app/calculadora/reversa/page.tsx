@@ -1,1 +1,1 @@
-Calculadora Reversa funcional
+Calculadora Reversa completa com lógica 1.8x
