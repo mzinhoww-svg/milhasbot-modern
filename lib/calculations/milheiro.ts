@@ -1,1 +1,1 @@
-/** ... (conteúdo completo já criado) */
+Código completo das funções de cálculo reutilizadas

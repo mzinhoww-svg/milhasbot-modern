@@ -1,1 +1,1 @@
-Calculadora funcional básica da Fase 0
+Calculadora completa com 4 modos
