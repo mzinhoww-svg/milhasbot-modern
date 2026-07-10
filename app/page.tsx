@@ -1,1 +1,1 @@
-Home atualizada com todas as fases
+Home page completa com links para todas as fases

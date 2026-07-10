@@ -1,1 +1,1 @@
-Comparador interativo melhorado
+Comparador de Programas interativo

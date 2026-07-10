@@ -1,1 +1,1 @@
-Página da calculadora funcional
+Calculadora do Milheiro funcional com 2 modos

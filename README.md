@@ -1,1 +1,1 @@
-README atualizado com status das fases
+README completo
