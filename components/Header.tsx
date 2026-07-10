@@ -8,14 +8,17 @@ const navGroups: { label: string; items: { href: string; label: string }[] }[] =
       { href: '/calculadora/reversa', label: 'Reversa' },
       { href: '/ferramentas/custo-fabricar', label: 'Custo de Fabricar' },
       { href: '/ferramentas/compras-bonificadas', label: 'Compras Bonificadas' },
+      { href: '/ferramentas/milhas-posto', label: 'Milhas de Posto' },
     ],
   },
   {
     label: 'Programas',
     items: [
       { href: '/ferramentas/comparar-programas', label: 'Comparar Programas' },
+      { href: '/ferramentas/livelo-vs-esfera', label: 'Livelo vs Esfera' },
       { href: '/ferramentas/planejador', label: 'Planejador' },
       { href: '/ferramentas/destinos-baratos', label: 'Destinos Baratos' },
+      { href: '/ferramentas/buscador-passagens', label: 'Buscador de Passagens' },
     ],
   },
   {
