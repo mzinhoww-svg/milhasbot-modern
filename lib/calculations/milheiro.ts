@@ -1,1 +1,1 @@
-Conteúdo completo do arquivo milheiro.ts
+Lógica completa da Calculadora do Milheiro

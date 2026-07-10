@@ -1,1 +1,1 @@
-Lógica da Calculadora Reversa reutilizada
+Lógica da Calculadora Reversa
