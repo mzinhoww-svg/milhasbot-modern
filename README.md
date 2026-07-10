@@ -106,10 +106,35 @@ Este projeto foi gerado a partir de uma **engenharia reversa completa** do site 
 
 ---
 
+## 🗄️ Banco de dados (Supabase)
+
+As leituras de referência no servidor vêm do **Supabase** (tabelas `mb_programa`,
+`mb_passagem`, `mb_bonus`), com **fallback automático** para os dados estáticos de
+`lib/data/` caso o Supabase esteja indisponível — o site nunca quebra por causa do banco.
+
+- Cliente: `lib/supabase.ts` (URL + chave publicável — públicas por design, protegidas
+  por RLS; sobrescrevíveis via `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY`).
+- Acesso: `lib/repositories/reference.ts` (Supabase quando disponível, senão `lib/data/`).
+- As tabelas têm RLS habilitado com política de **leitura pública** (dados de referência).
+
+As ferramentas interativas (client components) seguem usando `lib/data/` diretamente —
+a mesma fonte que popula o banco, mantendo consistência.
+
+### Banco dedicado (opcional, via Prisma)
+
+Para um Postgres próprio, há também `prisma/schema.prisma` + `prisma/seed.ts`:
+
+```bash
+cp .env.example .env    # preencha DATABASE_URL
+npm run db:push         # cria as tabelas
+npm run db:seed         # popula a partir de lib/data/
+```
+
 ## 📝 Status do Projeto
 
 - **Fase 0**: ✅ Concluída e utilizável
-- **Fase 1 a 4**: Em desenvolvimento (conforme solicitado)
+- **Fases 1 a 5**: ✅ Ferramentas funcionais, navegação global, editorial e admin protegido
+- **Banco**: ✅ Supabase conectado (leitura ao vivo) com fallback estático
 - **Deploy**: Preview disponível no Vercel
 
 ---

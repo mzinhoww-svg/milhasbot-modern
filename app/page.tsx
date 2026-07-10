@@ -48,6 +48,16 @@ const fases: Fase[] = [
         titulo: 'Custo de Fabricar Milhas',
         descricao: 'Quanto custa gerar milhas via cartão e compras no dia a dia',
       },
+      {
+        href: '/ferramentas/livelo-vs-esfera',
+        titulo: 'Livelo vs Esfera',
+        descricao: 'Qual banco de pontos rende mais para o seu destino, com os bônus ativos',
+      },
+      {
+        href: '/ferramentas/milhas-posto',
+        titulo: 'Milhas de Posto de Combustível',
+        descricao: 'Quanto você acumula abastecendo por ano e quanto isso vale',
+      },
     ],
   },
   {
@@ -63,6 +73,11 @@ const fases: Fase[] = [
         href: '/ferramentas/destinos-baratos',
         titulo: 'Destinos Mais Baratos em Milhas',
         descricao: 'Ranking de destinos com menor custo em milhas, por programa',
+      },
+      {
+        href: '/ferramentas/buscador-passagens',
+        titulo: 'Buscador de Passagens em Milhas',
+        descricao: 'Filtre a base de passagens por destino, região, cabine e milhas',
       },
     ],
   },

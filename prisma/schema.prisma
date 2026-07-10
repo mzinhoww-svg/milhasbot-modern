@@ -1,5 +1,6 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
+// Schema do MilhasBot Modern
+// Espelha as estruturas de lib/data/ (fonte estática de fallback).
+// learn more: https://pris.ly/d/prisma-schema
 
 generator client {
   provider = "prisma-client-js"
@@ -10,52 +11,34 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum Veredito {
-  EXCELENTE
-  BOM
-  LIMITROFE
-  CARO
-}
-
 model Programa {
   id            String   @id @default(cuid())
   slug          String   @unique
   nome          String
+  tipo          String // "Companhia aérea" | "Banco de pontos"
   valorRefBaixo Float
   valorRefAlto  Float
-  validadeMeses Int?
+  validadeMeses Int? // null = não expira
+  temClube      Boolean  @default(false)
+  paridades     String[]
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
   passagens Passagem[]
-  milheiros Milheiro[]
 }
 
 model Passagem {
   id         String   @id @default(cuid())
   destino    String
-  origem     String?
+  origem     String
   programaId String
   programa   Programa @relation(fields: [programaId], references: [id])
   milhas     Int
-  cabine     String   // economica | executiva
-  taxas      Float?
-  dataObs    DateTime
+  cabine     String // economica | executiva
+  regiao     String
   createdAt  DateTime @default(now())
 
   @@index([destino, milhas])
-}
-
-model Milheiro {
-  id         String   @id @default(cuid())
-  programaId String
-  programa   Programa @relation(fields: [programaId], references: [id])
-  mes        String
-  valorBaixo Float
-  valorAlto  Float
-  createdAt  DateTime @default(now())
-
-  @@unique([programaId, mes])
 }
 
 model BonusTransferencia {
@@ -63,9 +46,10 @@ model BonusTransferencia {
   origem     String
   destino    String
   percentual Float
-  dataInicio DateTime
-  dataFim    DateTime?
-  veredito   Veredito
-  observacao String?
+  inicio     DateTime
+  fim        DateTime
+  ativo      Boolean  @default(false)
   createdAt  DateTime @default(now())
+
+  @@index([origem, destino])
 }

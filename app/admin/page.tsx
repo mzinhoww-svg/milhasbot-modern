@@ -4,7 +4,7 @@ export default function Admin() {
   return (
     <div className="max-w-5xl mx-auto p-8">
       <h1 className="text-4xl font-bold mb-2">Painel Administrativo</h1>
-      <p className="text-zinc-400 mb-8">Fase 5 • Área para gerenciamento de conteúdo (mock)</p>
+      <p className="text-zinc-400 mb-8">Fase 5 • Área protegida por autenticação (Basic Auth)</p>
 
       <div className="grid md:grid-cols-3 gap-6">
         {[
