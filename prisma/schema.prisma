@@ -1,1 +1,71 @@
-Schema Prisma completo
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Veredito {
+  EXCELENTE
+  BOM
+  LIMITROFE
+  CARO
+}
+
+model Programa {
+  id            String   @id @default(cuid())
+  slug          String   @unique
+  nome          String
+  valorRefBaixo Float
+  valorRefAlto  Float
+  validadeMeses Int?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  passagens Passagem[]
+  milheiros Milheiro[]
+}
+
+model Passagem {
+  id         String   @id @default(cuid())
+  destino    String
+  origem     String?
+  programaId String
+  programa   Programa @relation(fields: [programaId], references: [id])
+  milhas     Int
+  cabine     String   // economica | executiva
+  taxas      Float?
+  dataObs    DateTime
+  createdAt  DateTime @default(now())
+
+  @@index([destino, milhas])
+}
+
+model Milheiro {
+  id         String   @id @default(cuid())
+  programaId String
+  programa   Programa @relation(fields: [programaId], references: [id])
+  mes        String
+  valorBaixo Float
+  valorAlto  Float
+  createdAt  DateTime @default(now())
+
+  @@unique([programaId, mes])
+}
+
+model BonusTransferencia {
+  id         String   @id @default(cuid())
+  origem     String
+  destino    String
+  percentual Float
+  dataInicio DateTime
+  dataFim    DateTime?
+  veredito   Veredito
+  observacao String?
+  createdAt  DateTime @default(now())
+}
