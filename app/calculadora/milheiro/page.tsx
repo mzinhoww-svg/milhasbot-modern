@@ -1,1 +1,1 @@
-Calculadora completa com 4 modos
+Página da calculadora funcional

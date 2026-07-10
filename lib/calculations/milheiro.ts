@@ -1,1 +1,1 @@
-Código completo das funções de cálculo reutilizadas
+Conteúdo completo do arquivo milheiro.ts
