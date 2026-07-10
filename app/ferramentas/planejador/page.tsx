@@ -2,19 +2,7 @@
 
 import { useState } from 'react';
 import { calcularQuantoValem, getVeredito, getVereditoColor, getVereditoLabel, VALORES_REFERENCIA, type Programa } from '@/lib/calculations/milheiro';
-
-// Mock de passagens (simulando wp_mb_passagens)
-const mockPassagens = [
-  { destino: 'Brasília', milhas: 5000, classe: 'Econômica', programa: 'Smiles' as Programa },
-  { destino: 'Rio de Janeiro', milhas: 5000, classe: 'Econômica', programa: 'LATAM' as Programa },
-  { destino: 'Recife', milhas: 6100, classe: 'Econômica', programa: 'Smiles' as Programa },
-  { destino: 'Foz do Iguaçu', milhas: 9000, classe: 'Econômica', programa: 'Azul' as Programa },
-  { destino: 'Buenos Aires', milhas: 10000, classe: 'Econômica', programa: 'LATAM' as Programa },
-  { destino: 'Santiago', milhas: 11000, classe: 'Econômica', programa: 'LATAM' as Programa },
-  { destino: 'Madri', milhas: 12800, classe: 'Econômica', programa: 'Iberia' as Programa },
-  { destino: 'Paris', milhas: 31000, classe: 'Econômica', programa: 'Flying Blue' as any },
-  { destino: 'Orlando', milhas: 25800, classe: 'Econômica', programa: 'Aeroplan' as Programa },
-];
+import { passagens } from '@/lib/data/passagens';
 
 interface SaldoPrograma {
   programa: Programa;
@@ -32,16 +20,20 @@ export default function Planejador() {
   // Calcular total de milhas
   const totalMilhas = saldos.reduce((acc, s) => acc + s.saldo, 0);
 
-  // Buscar destinos compatíveis
-  const destinosCompativeis = mockPassagens
+  // Buscar destinos compatíveis (a partir da base central de passagens)
+  const cabineAlvo = classe === 'Econômica' ? 'economica' : 'executiva';
+  const destinosCompativeis = passagens
+    .filter(p => p.cabine === cabineAlvo)
     .filter(p => p.milhas <= totalMilhas * 0.92)
     .map(passagem => {
       const melhorPrograma = saldos.find(s => s.saldo >= passagem.milhas)?.programa || passagem.programa;
       const valor = calcularQuantoValem(passagem.milhas, VALORES_REFERENCIA[melhorPrograma as Programa]?.alto || 25);
-      const veredito = getVeredito(valor, melhorPrograma as Programa);
+      const veredito = getVeredito(VALORES_REFERENCIA[melhorPrograma as Programa]?.alto || 25, melhorPrograma as Programa);
 
       return {
-        ...passagem,
+        destino: passagem.destino,
+        milhas: passagem.milhas,
+        classe,
         programaRecomendado: melhorPrograma,
         valorEstimado: valor,
         veredito,
