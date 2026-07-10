@@ -106,10 +106,28 @@ Este projeto foi gerado a partir de uma **engenharia reversa completa** do site 
 
 ---
 
+## 🗄️ Banco de dados (Prisma + Supabase) — opcional
+
+O projeto funciona **sem banco**: todos os dados de referência ficam em `lib/data/`
+(fonte única versionada) e servem de fallback. Quando uma `DATABASE_URL` é
+configurada, as leituras no servidor passam a vir do banco automaticamente.
+
+Para ativar:
+
+```bash
+cp .env.example .env          # preencha DATABASE_URL com a connection string do Supabase
+npm run db:push               # cria as tabelas (Programa, Passagem, BonusTransferencia)
+npm run db:seed               # popula a partir de lib/data/
+```
+
+Na Vercel, basta definir `DATABASE_URL` nas variáveis de ambiente. A camada
+`lib/repositories/reference.ts` decide sozinha entre banco e fallback.
+
 ## 📝 Status do Projeto
 
 - **Fase 0**: ✅ Concluída e utilizável
-- **Fase 1 a 4**: Em desenvolvimento (conforme solicitado)
+- **Fases 1 a 5**: ✅ Ferramentas funcionais, navegação global, editorial e admin protegido
+- **Banco**: infraestrutura Prisma + Supabase pronta; ativável via `DATABASE_URL`
 - **Deploy**: Preview disponível no Vercel
 
 ---

@@ -32,18 +32,26 @@ export const bonusTransferencias: BonusTransferencia[] = [
   { origem: 'Esfera', destino: 'LATAM', percentual: 80, inicio: '2025-12-10', fim: '2025-12-18', ativo: false },
 ];
 
-export function bonusAtivos(): BonusTransferencia[] {
-  return bonusTransferencias.filter((b) => b.ativo);
+export function bonusAtivos(list: BonusTransferencia[] = bonusTransferencias): BonusTransferencia[] {
+  return list.filter((b) => b.ativo);
 }
 
-export function historicoRota(origem: string, destino: string): BonusTransferencia[] {
-  return bonusTransferencias
+export function historicoRota(
+  origem: string,
+  destino: string,
+  list: BonusTransferencia[] = bonusTransferencias,
+): BonusTransferencia[] {
+  return list
     .filter((b) => b.origem === origem && b.destino === destino)
     .sort((a, b) => (a.inicio < b.inicio ? 1 : -1));
 }
 
-export function mediaHistoricaRota(origem: string, destino: string): number | null {
-  const hist = bonusTransferencias.filter((b) => b.origem === origem && b.destino === destino);
+export function mediaHistoricaRota(
+  origem: string,
+  destino: string,
+  list: BonusTransferencia[] = bonusTransferencias,
+): number | null {
+  const hist = list.filter((b) => b.origem === origem && b.destino === destino);
   if (hist.length === 0) return null;
   return hist.reduce((sum, b) => sum + b.percentual, 0) / hist.length;
 }

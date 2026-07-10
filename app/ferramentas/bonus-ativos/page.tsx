@@ -1,11 +1,13 @@
-'use client';
-
+import { getBonusTransferencias } from '@/lib/repositories/reference';
 import { bonusAtivos, mediaHistoricaRota, vereditoBonus } from '@/lib/data/bonus';
 
-export default function BonusAtivos() {
-  const ativos = bonusAtivos()
+export const metadata = { title: 'Bônus de Transferência Ativos' };
+
+export default async function BonusAtivos() {
+  const todos = await getBonusTransferencias();
+  const ativos = bonusAtivos(todos)
     .map((b) => {
-      const media = mediaHistoricaRota(b.origem, b.destino);
+      const media = mediaHistoricaRota(b.origem, b.destino, todos);
       return { ...b, media, veredito: vereditoBonus(b.percentual, media) };
     })
     .sort((a, b) => b.percentual - a.percentual);
