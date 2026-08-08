@@ -43,7 +43,7 @@ const navGroups: { label: string; items: { href: string; label: string }[] }[] =
   {
     label: 'Voos',
     items: [
-      { href: '/rotas', label: 'Buscar voos' },
+      { href: '/rotas', label: 'Rotas criativas' },
       { href: '/rotas/aeroporto/GRU', label: 'Diretos de GRU' },
       { href: '/rotas/aeroporto/GIG', label: 'Diretos do GIG' },
       { href: '/rotas/aeroporto/MIA', label: 'Diretos de MIA' },

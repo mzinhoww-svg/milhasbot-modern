@@ -182,17 +182,18 @@ export default function Home() {
           className="group mb-14 block rounded-2xl border border-emerald-500/40 bg-emerald-500/5 p-8 transition-colors hover:border-emerald-500"
         >
           <span className="text-sm font-medium uppercase tracking-wider text-emerald-400">
-            Novo • Busca de Voos
+            Novo • Rotas Criativas
           </span>
           <h2 className="mt-2 text-3xl font-semibold group-hover:text-emerald-400">
-            Voos reais das Américas, com horário de verdade
+            Rotas criativas para viagem de staff
           </h2>
           <p className="mt-3 max-w-2xl text-zinc-400">
-            {airports.length.toLocaleString('pt-BR')} aeroportos em {paises.length} países. Busque
-            por país ou região inteira, filtre pelo horário em que precisa chegar e veja com qual
-            programa dá para emitir. Tarifas, horários e preços vêm do Travelpayouts.
+            Quando o voo direto está cheio, encontra caminhos alternativos por hubs não óbvios —
+            inclusive trocando de aeroporto na mesma cidade — e diz se dá para chegar no horário.
+            Malha real do OpenFlights, {airports.length.toLocaleString('pt-BR')} aeroportos das
+            Américas.
           </p>
-          <div className="mt-4 text-sm text-emerald-400">Abrir a busca →</div>
+          <div className="mt-4 text-sm text-emerald-400">Abrir as rotas →</div>
         </Link>
 
         {fases.map((fase) => (
