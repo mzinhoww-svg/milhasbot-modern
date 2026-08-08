@@ -86,8 +86,23 @@ FlightConnections não entrega.
 não o inventário ao vivo das companhias. Durações e horários de chegada são
 estimados a partir da distância — não são o horário publicado. A tela diz isso.
 
-Validação da base: `npm run flights:validate` (checa IATAs órfãos, fusos inválidos,
-coordenadas fora da janela do mapa e distâncias contra valores conhecidos).
+**Exemplo do que ele responde** — sair de Atlanta às 8h e chegar ao Brasil até 17h:
+
+```
+$ npm run flights:consulta -- ATL Brasil 17:00
+
+ATL → Brasil · saindo 08:00 (hora local de Atlanta) · chegar até 17:00
+ATL → PTY → MAO   8h58   chega 16:58   Manaus   Aeroplan, ConnectMiles, LifeMiles
+1 de 12 cidades chegam até 17:00
+```
+
+E para GRU especificamente: saindo 06:20 chega 17:00 em ponto; saindo 06:30 já não dá.
+
+Scripts:
+- `npm run flights:validate` — checa IATAs órfãos, fusos inválidos, coordenadas
+  fora da janela do mapa e distâncias contra valores conhecidos
+- `npm run flights:consulta -- <ORIGEM> <destino> [chegar-até] [partida]` — a mesma
+  busca da tela pela linha de comando
 
 ### Fase 4 - Cartões + Na Viagem (P1/P2)
 - Anuidade Líquida do Cartão

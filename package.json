@@ -10,7 +10,8 @@
     "postinstall": "prisma generate",
     "db:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",
-    "flights:validate": "tsx scripts/validate-flights.ts"
+    "flights:validate": "tsx scripts/validate-flights.ts",
+    "flights:consulta": "tsx scripts/consulta-exemplo.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
