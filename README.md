@@ -49,6 +49,61 @@ Este projeto nasceu do **Prompt de Engenharia Reversa Completa** do site [milhas
 - Bônus de transferência ativos
 - Transferir para ALL Accor
 
+### Fase 6 - Rotas Criativas nas Américas (P0)
+Alternativa ao FlightConnections pensada para **viagem de staff / não-revenue**:
+quando o voo direto está cheio, o que resolve é uma rota alternativa por um hub
+não óbvio (MSP→BNA→ATL em vez do MSP→ATL direto lotado). A busca abre **várias
+opções diversas**, não só o caminho mais curto.
+
+- **Rotas criativas** (`/rotas`) — acha caminhos de até 3 voos por hubs
+  alternativos por hubs não óbvios (só voos) e filtro de horário de chegada
+- **Voos diretos por aeroporto** (`/rotas/aeroporto/[iata]`) — a malha direta
+  real de cada aeroporto
+
+**Casos reais que o motor resolve** (verificados nos dados):
+
+| Situação | O que a busca acha |
+|---|---|
+| MSP→ATL direto cheio | MSP→**BNA**→ATL (e via MLI, PIA, BMI, SDF, STL…) |
+| ATL→Cuiabá (CGB) sábado | via GIG (13h44) **e** via BSB (11h46, mais rápida); via LIM sai 16h37 — corretamente pior |
+| Chegar em qualquer aeroporto de São Paulo | trata GRU/CGH/VCP como a mesma cidade |
+
+#### Procedência de cada dado
+
+| Dado | Fonte | Natureza |
+|---|---|---|
+| Malha de voos diretos (quem voa cada trecho) | [OpenFlights](https://raw.githubusercontent.com/jpatokal/openflights/master/data/routes.dat) | gerado em `lib/flights/routes.data.ts` |
+| Aeroportos, coordenadas, cidade | [OurAirports](https://davidmegginson.github.io/ourairports-data/airports.csv) | gerado em `lib/flights/airports.data.ts` |
+| Fuso de cada aeroporto | `tz-lookup` sobre as coordenadas | derivado |
+| Horários das rotas criativas | distância + tempos padrão de conexão | **estimativa, marcada como tal** |
+| Tarifa e link de reserva | Travelpayouts (Aviasales), sob demanda por trecho | operacional, opcional |
+| Aliança e programas de milhas | curadoria editorial datada | as partes sem API |
+
+O motor de rotas roda **em memória, no servidor, sem chave nenhuma** — é
+instantâneo e não depende de rede. O Travelpayouts entra só quando o usuário
+pede a tarifa de um trecho (e o link carrega o `marker` de afiliado).
+
+**Honestidade sobre os dados:** a topologia do OpenFlights é um snapshot de
+referência — os trechos são reais, mas códigos de companhia podem ser antigos
+(JJ = LATAM/TAM). Companhia sem nome no snapshot aparece pelo código, nunca
+inventada. Horários são estimados; confirme disponibilidade com a companhia.
+
+#### Configuração (opcional)
+
+Rotas criativas funcionam sem nenhuma credencial. Para a tarifa/reserva por
+trecho, o token do Travelpayouts:
+
+```bash
+TRAVELPAYOUTS_TOKEN="..."      # tarifa e link de reserva por trecho
+TRAVELPAYOUTS_MARKER="..."     # ID de parceiro, para comissão de afiliado
+```
+
+#### Scripts
+
+- `npm run flights:aeroportos` — regera a base de aeroportos (OurAirports)
+- `npm run flights:rotas` — regera a malha de voos diretos (OpenFlights)
+- `npm run flights:checar` — diagnostica o token do Travelpayouts fora do Next
+
 ### Fase 4 - Cartões + Na Viagem (P1/P2)
 - Anuidade Líquida do Cartão
 - Conta Global vs Cartão no Exterior

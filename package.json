@@ -9,7 +9,10 @@
     "lint": "eslint",
     "postinstall": "prisma generate",
     "db:push": "prisma db push",
-    "db:seed": "tsx prisma/seed.ts"
+    "db:seed": "tsx prisma/seed.ts",
+    "flights:aeroportos": "node scripts/gerar-aeroportos.mjs",
+    "flights:rotas": "node scripts/gerar-rotas.mjs",
+    "flights:checar": "node scripts/checar-travelpayouts.mjs"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
@@ -19,7 +22,8 @@
     "@supabase/supabase-js": "^2.110.2",
     "next": "16.2.10",
     "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "react-dom": "19.2.4",
+    "server-only": "^0.0.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
@@ -31,6 +35,7 @@
     "prisma": "^6.19.3",
     "tailwindcss": "^4",
     "tsx": "^4.23.0",
-    "typescript": "^5"
+    "typescript": "^5",
+    "tz-lookup": "^6.1.25"
   }
 }

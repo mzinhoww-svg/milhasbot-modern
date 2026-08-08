@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { airports, paises } from '@/lib/flights/airports';
 
 interface Ferramenta {
   href: string;
@@ -175,6 +176,25 @@ export default function Home() {
             das fórmulas originais
           </div>
         </div>
+
+        <Link
+          href="/rotas"
+          className="group mb-14 block rounded-2xl border border-emerald-500/40 bg-emerald-500/5 p-8 transition-colors hover:border-emerald-500"
+        >
+          <span className="text-sm font-medium uppercase tracking-wider text-emerald-400">
+            Novo • Rotas Criativas
+          </span>
+          <h2 className="mt-2 text-3xl font-semibold group-hover:text-emerald-400">
+            Rotas criativas para viagem de staff
+          </h2>
+          <p className="mt-3 max-w-2xl text-zinc-400">
+            Quando o voo direto está cheio, encontra caminhos alternativos por hubs não óbvios —
+            inclusive trocando de aeroporto na mesma cidade — e diz se dá para chegar no horário.
+            Malha real do OpenFlights, {airports.length.toLocaleString('pt-BR')} aeroportos das
+            Américas.
+          </p>
+          <div className="mt-4 text-sm text-emerald-400">Abrir as rotas →</div>
+        </Link>
 
         {fases.map((fase) => (
           <section key={fase.numero} className="mb-14">
