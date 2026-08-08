@@ -1,4 +1,6 @@
 import Link from 'next/link';
+import { airlines } from '@/lib/flights/airlines';
+import { TOTAL_AEROPORTOS, TOTAL_ROTAS } from '@/lib/flights/network';
 
 interface Ferramenta {
   href: string;
@@ -175,6 +177,24 @@ export default function Home() {
             das fórmulas originais
           </div>
         </div>
+
+        <Link
+          href="/rotas"
+          className="group mb-14 block rounded-2xl border border-emerald-500/40 bg-emerald-500/5 p-8 transition-colors hover:border-emerald-500"
+        >
+          <span className="text-sm font-medium uppercase tracking-wider text-emerald-400">
+            Novo • Mapa de Rotas
+          </span>
+          <h2 className="mt-2 text-3xl font-semibold group-hover:text-emerald-400">
+            Todas as rotas das Américas em um mapa
+          </h2>
+          <p className="mt-3 max-w-2xl text-zinc-400">
+            {TOTAL_ROTAS.toLocaleString('pt-BR')} rotas de {airlines.length} companhias entre{' '}
+            {TOTAL_AEROPORTOS} aeroportos. Busque por país ou região inteira, filtre por horário de
+            chegada e veja com qual programa dá para emitir cada trecho.
+          </p>
+          <div className="mt-4 text-sm text-emerald-400">Abrir o mapa →</div>
+        </Link>
 
         {fases.map((fase) => (
           <section key={fase.numero} className="mb-14">

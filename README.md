@@ -49,6 +49,46 @@ Este projeto nasceu do **Prompt de Engenharia Reversa Completa** do site [milhas
 - Bônus de transferência ativos
 - Transferir para ALL Accor
 
+### Fase 6 - Mapa de Rotas das Américas (P0)
+Alternativa ao FlightConnections, com recorte deliberado nas **Américas** e nas
+**principais companhias** — é o recorte que torna possível entregar o que o
+FlightConnections não entrega.
+
+- **Mapa de rotas** (`/rotas`) — 2.043 rotas de 19 companhias entre 176 aeroportos
+- **Página por companhia** (`/rotas/cia/[code]`) — malha completa, alcance e parceiros
+- **Página por aeroporto** (`/rotas/aeroporto/[iata]`) — destinos diretos por região
+
+**O que ele faz melhor:**
+
+| | FlightConnections | Aqui |
+|---|---|---|
+| Mapa | tiles externos, carrega a cada interação | SVG pré-projetado no bundle, zero requisição |
+| Destino | um aeroporto por vez | aeroporto, **país** ou **região inteira** |
+| Conexões | foco em voo direto | direto, 1 e 2 paradas com tempo mínimo de conexão |
+| Horário | — | **"chegar até"** com fuso real de cada aeroporto |
+| Milhas | — | **qual programa emite** cada itinerário inteiro |
+| Busca | ida e volta ao servidor | grafo inteiro em memória, resposta em milissegundos |
+
+**Como funciona por dentro:**
+- `lib/flights/land.ts` — contorno das Américas derivado do Natural Earth (110m),
+  simplificado com Douglas-Peucker e **pré-projetado** em Mercator. É um arquivo
+  gerado: o mapa não faz nenhuma requisição externa.
+- `lib/flights/geo.ts` — projeção, distância ortodrômica e traçado dos arcos pelo
+  círculo máximo (uma reta no Mercator seria a rota errada).
+- `lib/flights/network.ts` — grafo de ~180 nós montado no import; busca direto,
+  1 e 2 paradas com corte por desvio máximo sobre a rota direta.
+- `lib/flights/time.ts` — fuso IANA por aeroporto, com horário de verão resolvido
+  pelo próprio runtime via `Intl`.
+- `lib/flights/airlines.ts` — o diferencial: para cada companhia, **quais programas
+  emitem**. Um itinerário só é emissível num programa se *todos* os trechos forem.
+
+**Honestidade sobre os dados:** é uma base curada de referência para planejamento,
+não o inventário ao vivo das companhias. Durações e horários de chegada são
+estimados a partir da distância — não são o horário publicado. A tela diz isso.
+
+Validação da base: `npm run flights:validate` (checa IATAs órfãos, fusos inválidos,
+coordenadas fora da janela do mapa e distâncias contra valores conhecidos).
+
 ### Fase 4 - Cartões + Na Viagem (P1/P2)
 - Anuidade Líquida do Cartão
 - Conta Global vs Cartão no Exterior
