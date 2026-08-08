@@ -1,182 +1,168 @@
 'use client';
 
-import Link from 'next/link';
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import LocalPicker from '@/components/flights/LocalPicker';
 import RouteMap, { type Arco, type Marcador } from '@/components/flights/RouteMap';
-import { airportByIata } from '@/lib/flights/airports';
-import { ALIANCAS, type Alianca, PROGRAMAS, airlineByCode, airlines } from '@/lib/flights/airlines';
-import { formatDuration } from '@/lib/flights/geo';
+import { type Alvo, airportByIata, resolverAlvo, rotuloAlvo } from '@/lib/flights/airports';
 import {
-  type Alvo,
-  type Itinerario,
-  TOTAL_AEROPORTOS,
-  TOTAL_ROTAS,
-  buscarItinerarios,
-  resolverAlvo,
-  rotuloAlvo,
-} from '@/lib/flights/network';
-import { ROUTES_REVISAO } from '@/lib/flights/routes';
-import { chegadaLocal, formatHourMinute, parseHourMinute, rotuloFuso } from '@/lib/flights/time';
+  PROGRAMAS_REVISAO,
+  corDaCompanhia,
+  nomeDaCompanhia,
+  programasDoItinerario,
+  temCompanhiaForaDaCuradoria,
+} from '@/lib/flights/airlines';
+import { formatDuration } from '@/lib/flights/geo';
 
-const SUGESTOES: { rotulo: string; origem: string; alvo: Alvo }[] = [
-  { rotulo: 'Atlanta → Brasil', origem: 'ATL', alvo: { tipo: 'pais', valor: 'Brasil' } },
-  { rotulo: 'São Paulo → Caribe', origem: 'GRU', alvo: { tipo: 'regiao', valor: 'Caribe' } },
-  { rotulo: 'Rio → México', origem: 'GIG', alvo: { tipo: 'pais', valor: 'México' } },
-  { rotulo: 'Recife → Estados Unidos', origem: 'REC', alvo: { tipo: 'pais', valor: 'Estados Unidos' } },
-  { rotulo: 'Brasília → Colômbia', origem: 'BSB', alvo: { tipo: 'pais', valor: 'Colômbia' } },
-];
+interface SegmentoReal {
+  de: string;
+  para: string;
+  partida: string;
+  chegada: string;
+  companhia: string;
+  companhiaNome?: string;
+  operadoPor?: string;
+  voo: string;
+  aeronave?: string;
+  duracaoMin: number;
+}
 
-interface Avaliado {
-  itinerario: Itinerario;
-  chegada: { minutos: number; diaSeguinte: number };
-  dentroDoPrazo: boolean;
+interface ItinerarioReal {
+  id: string;
+  segmentos: SegmentoReal[];
+  paradas: number;
+  duracaoMin: number;
+  destino: string;
+  preco?: { total: number; moeda: string };
+  companhias: string[];
+  chegada: { data: string; minutos: number } | null;
+}
+
+interface Resposta {
+  fonte: string;
+  ambiente: string;
+  consultados: string[];
+  ignorados: string[];
+  falhas: { destino: string; motivo: string }[];
+  total: number;
+  itinerarios: ItinerarioReal[];
+}
+
+interface Falha {
+  mensagem: string;
+  configurado?: boolean;
+}
+
+const hora = (iso: string) => iso.slice(11, 16);
+const dia = (iso: string) => iso.slice(0, 10);
+
+function emDias(partida: string, chegada: string): number {
+  const a = Date.parse(`${dia(partida)}T00:00:00Z`);
+  const b = Date.parse(`${dia(chegada)}T00:00:00Z`);
+  return Math.round((b - a) / 86_400_000);
+}
+
+function amanha(): string {
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  return d.toISOString().slice(0, 10);
 }
 
 export default function RotasExplorer() {
   const [origem, setOrigem] = useState<Alvo | null>({ tipo: 'aeroporto', valor: 'ATL' });
   const [destino, setDestino] = useState<Alvo | null>({ tipo: 'pais', valor: 'Brasil' });
-  const [maxParadas, setMaxParadas] = useState(1);
-  const [alianca, setAlianca] = useState<Alianca | ''>('');
-  const [programa, setPrograma] = useState('');
-  const [companhia, setCompanhia] = useState('');
-  const [partida, setPartida] = useState('08:00');
+  const [data, setData] = useState(amanha());
   const [chegarAte, setChegarAte] = useState('');
-  const [soDentroDoPrazo, setSoDentroDoPrazo] = useState(true);
-  const [umPorDestino, setUmPorDestino] = useState(true);
+  const [maxParadas, setMaxParadas] = useState(1);
   const [selecionado, setSelecionado] = useState(0);
 
+  const [resposta, setResposta] = useState<Resposta | null>(null);
+  const [falha, setFalha] = useState<Falha | null>(null);
+  const [carregando, setCarregando] = useState(false);
+
   const origemIata = origem?.tipo === 'aeroporto' ? origem.valor : null;
+  const podeBuscar = Boolean(origemIata && destino && data);
 
-  const resultados = useMemo<Avaliado[]>(() => {
-    if (!origemIata || !destino) return [];
+  const buscar = useCallback(async () => {
+    if (!origemIata || !destino) return;
 
-    const itinerarios = buscarItinerarios({
-      origens: [origemIata],
-      alvo: destino,
-      maxParadas,
-      aliancas: alianca ? [alianca] : undefined,
-      programa: programa || undefined,
-      companhias: companhia ? [companhia] : undefined,
-      limite: 40,
+    setCarregando(true);
+    setFalha(null);
+
+    const params = new URLSearchParams({
+      de: origemIata,
+      alvo: `${destino.tipo}:${destino.valor}`,
+      data,
+      paradas: String(maxParadas),
     });
+    if (chegarAte) params.set('chegarAte', chegarAte);
 
-    const partidaMin = parseHourMinute(partida) ?? 8 * 60;
-    const limite = parseHourMinute(chegarAte);
-    const aeroportoOrigem = airportByIata.get(origemIata)!;
+    try {
+      const r = await fetch(`/api/rotas/itinerarios?${params}`);
+      const corpo = await r.json();
 
-    // A data serve só para resolver horário de verão; o resultado é o horário
-    // local estimado, não uma data de viagem específica.
-    const hoje = new Date();
-    const data = new Date(Date.UTC(hoje.getFullYear(), hoje.getMonth(), hoje.getDate()));
-
-    return itinerarios.map((itinerario) => {
-      const aeroportoDestino = airportByIata.get(itinerario.destino)!;
-      const chegada = chegadaLocal(
-        data,
-        aeroportoOrigem.tz,
-        partidaMin,
-        aeroportoDestino.tz,
-        itinerario.minutosTotal,
-      );
-
-      const dentroDoPrazo =
-        limite === null || (chegada.diaSeguinte === 0 && chegada.minutos <= limite);
-
-      return { itinerario, chegada, dentroDoPrazo };
-    });
-  }, [origemIata, destino, maxParadas, alianca, programa, companhia, partida, chegarAte]);
-
-  const buscaPorGrupo = destino !== null && destino.tipo !== 'aeroporto';
-
-  const visiveis = useMemo(() => {
-    let lista =
-      soDentroDoPrazo && chegarAte ? resultados.filter((r) => r.dentroDoPrazo) : resultados;
-
-    // Buscando um país ou região inteira, dezenas de caminhos até a mesma
-    // cidade só empurram os outros destinos para fora da lista. Guarda o
-    // melhor de cada — a lista já vem ordenada por tempo total.
-    if (buscaPorGrupo && umPorDestino) {
-      const melhores = new Map<string, Avaliado>();
-      for (const r of lista) {
-        if (!melhores.has(r.itinerario.destino)) melhores.set(r.itinerario.destino, r);
+      if (!r.ok) {
+        setResposta(null);
+        setFalha({ mensagem: corpo?.erro ?? `Falha na busca (HTTP ${r.status}).`, configurado: corpo?.configurado });
+        return;
       }
-      lista = [...melhores.values()];
+
+      setResposta(corpo as Resposta);
+      setSelecionado(0);
+    } catch (e) {
+      setResposta(null);
+      setFalha({ mensagem: e instanceof Error ? e.message : 'Falha de rede na busca.' });
+    } finally {
+      setCarregando(false);
     }
+  }, [origemIata, destino, data, maxParadas, chegarAte]);
 
-    return lista;
-  }, [resultados, soDentroDoPrazo, chegarAte, buscaPorGrupo, umPorDestino]);
-
-  const foco = visiveis[Math.min(selecionado, visiveis.length - 1)];
+  // A busca é sempre explícita: cada consulta gasta cota da Amadeus, então
+  // abrir a página não dispara requisição nenhuma.
+  const itinerarios = resposta?.itinerarios ?? [];
+  const foco = itinerarios[Math.min(selecionado, itinerarios.length - 1)];
 
   const { arcos, marcadores } = useMemo(() => {
     const arcos: Arco[] = [];
     const marcadores: Marcador[] = [];
 
-    // Contexto: todos os aeroportos que satisfazem o destino escolhido.
     if (destino) {
       for (const a of resolverAlvo(destino, origemIata ? [origemIata] : [])) {
-        marcadores.push({ iata: a.iata, tipo: 'ponto' });
+        if (a.grande) marcadores.push({ iata: a.iata, tipo: 'ponto' });
       }
     }
 
-    // Malha de fundo com as demais opções encontradas.
-    for (const { itinerario } of visiveis.slice(0, 12)) {
-      for (const s of itinerario.segmentos) {
-        arcos.push({ de: s.de, para: s.para, cor: '#3f3f46' });
-      }
+    for (const it of itinerarios.slice(0, 10)) {
+      for (const s of it.segmentos) arcos.push({ de: s.de, para: s.para, cor: '#3f3f46' });
     }
 
     if (foco) {
-      const { itinerario } = foco;
-      for (const s of itinerario.segmentos) {
-        const cor = airlineByCode.get(s.companhias[0])?.cor ?? '#10b981';
-        arcos.push({ de: s.de, para: s.para, cor, destaque: true });
+      for (const s of foco.segmentos) {
+        arcos.push({ de: s.de, para: s.para, cor: corDaCompanhia(s.companhia), destaque: true });
       }
-      marcadores.push({ iata: itinerario.segmentos[0].de, tipo: 'origem' });
-      for (const c of itinerario.conexoes) marcadores.push({ iata: c.iata, tipo: 'conexao' });
-      marcadores.push({ iata: itinerario.destino, tipo: 'destino' });
+      marcadores.push({ iata: foco.segmentos[0].de, tipo: 'origem' });
+      for (const s of foco.segmentos.slice(0, -1)) {
+        marcadores.push({ iata: s.para, tipo: 'conexao' });
+      }
+      marcadores.push({ iata: foco.destino, tipo: 'destino' });
     } else if (origemIata) {
       marcadores.push({ iata: origemIata, tipo: 'origem' });
     }
 
     return { arcos, marcadores };
-  }, [visiveis, foco, destino, origemIata]);
-
-  const fusoOrigem = origemIata
-    ? rotuloFuso(airportByIata.get(origemIata)!.tz, new Date())
-    : '';
+  }, [itinerarios, foco, destino, origemIata]);
 
   return (
     <div className="mx-auto max-w-7xl px-6 py-8">
       <header className="mb-6">
-        <h1 className="text-4xl font-bold tracking-tight">Mapa de Rotas das Américas</h1>
+        <h1 className="text-4xl font-bold tracking-tight">Busca de Voos nas Américas</h1>
         <p className="mt-2 max-w-3xl text-zinc-400">
-          {TOTAL_ROTAS.toLocaleString('pt-BR')} rotas de {airlines.length} companhias entre{' '}
-          {TOTAL_AEROPORTOS} aeroportos. Busque por aeroporto, <strong>país</strong> ou{' '}
-          <strong>região inteira</strong>, filtre por horário de chegada e veja com qual programa de
-          milhas dá para emitir cada itinerário.
+          Voos e horários reais da API da Amadeus. Busque por aeroporto,{' '}
+          <strong>país</strong> ou <strong>região inteira</strong> e filtre pelo horário em que você
+          precisa chegar — o horário comparado é o publicado pela companhia, não uma estimativa.
         </p>
       </header>
 
-      <div className="mb-4 flex flex-wrap gap-2">
-        {SUGESTOES.map((s) => (
-          <button
-            key={s.rotulo}
-            type="button"
-            onClick={() => {
-              setOrigem({ tipo: 'aeroporto', valor: s.origem });
-              setDestino(s.alvo);
-              setSelecionado(0);
-            }}
-            className="rounded-full border border-zinc-800 bg-zinc-900 px-3 py-1.5 text-xs text-zinc-300 transition-colors hover:border-emerald-500 hover:text-white"
-          >
-            {s.rotulo}
-          </button>
-        ))}
-      </div>
-
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,420px)_minmax(0,1fr)]">
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,430px)_minmax(0,1fr)]">
         <div className="space-y-4">
           <div className="space-y-4 rounded-2xl border border-zinc-800 bg-zinc-900/40 p-4">
             <div className="grid gap-3 sm:grid-cols-2">
@@ -184,66 +170,30 @@ export default function RotasExplorer() {
               <LocalPicker
                 label="Destino"
                 valor={destino}
-                onChange={(v) => {
-                  setDestino(v);
-                  setSelecionado(0);
-                }}
+                onChange={setDestino}
                 permitirGrupos
                 placeholder="Aeroporto, país ou região"
               />
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2">
-              <div>
-                <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-zinc-500">
-                  Partida {fusoOrigem && <span className="normal-case text-zinc-600">({fusoOrigem})</span>}
-                </label>
+              <Campo rotulo="Data da ida">
                 <input
-                  type="time"
-                  value={partida}
-                  onChange={(e) => setPartida(e.target.value)}
+                  type="date"
+                  value={data}
+                  min={new Date().toISOString().slice(0, 10)}
+                  onChange={(e) => setData(e.target.value)}
                   className="w-full rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-white focus:border-emerald-500 focus:outline-none"
                 />
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-zinc-500">
-                  Chegar até <span className="normal-case text-zinc-600">(hora local)</span>
-                </label>
+              </Campo>
+              <Campo rotulo="Chegar até" detalhe="hora local do destino">
                 <input
                   type="time"
                   value={chegarAte}
                   onChange={(e) => setChegarAte(e.target.value)}
                   className="w-full rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-white focus:border-emerald-500 focus:outline-none"
                 />
-              </div>
-            </div>
-
-            <div className="space-y-1.5">
-              {chegarAte && (
-                <label className="flex items-center gap-2 text-xs text-zinc-400">
-                  <input
-                    type="checkbox"
-                    checked={soDentroDoPrazo}
-                    onChange={(e) => setSoDentroDoPrazo(e.target.checked)}
-                    className="accent-emerald-500"
-                  />
-                  Esconder itinerários que chegam depois de {chegarAte}
-                </label>
-              )}
-              {buscaPorGrupo && (
-                <label className="flex items-center gap-2 text-xs text-zinc-400">
-                  <input
-                    type="checkbox"
-                    checked={umPorDestino}
-                    onChange={(e) => {
-                      setUmPorDestino(e.target.checked);
-                      setSelecionado(0);
-                    }}
-                    className="accent-emerald-500"
-                  />
-                  Mostrar só a melhor opção de cada cidade
-                </label>
-              )}
+              </Campo>
             </div>
 
             <div>
@@ -255,10 +205,7 @@ export default function RotasExplorer() {
                   <button
                     key={n}
                     type="button"
-                    onClick={() => {
-                      setMaxParadas(n);
-                      setSelecionado(0);
-                    }}
+                    onClick={() => setMaxParadas(n)}
                     className={`flex-1 rounded-xl px-3 py-2 text-sm transition-colors ${
                       maxParadas === n
                         ? 'bg-emerald-500 text-white'
@@ -271,281 +218,333 @@ export default function RotasExplorer() {
               </div>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-3">
-              <div>
-                <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-zinc-500">
-                  Aliança
-                </label>
-                <select
-                  value={alianca}
-                  onChange={(e) => setAlianca(e.target.value as Alianca | '')}
-                  className="w-full rounded-xl border border-zinc-700 bg-zinc-900 px-2 py-2 text-sm text-white focus:border-emerald-500 focus:outline-none"
-                >
-                  <option value="">Todas</option>
-                  {(Object.keys(ALIANCAS) as Alianca[]).map((a) => (
-                    <option key={a} value={a}>
-                      {ALIANCAS[a].nome}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-zinc-500">
-                  Companhia
-                </label>
-                <select
-                  value={companhia}
-                  onChange={(e) => setCompanhia(e.target.value)}
-                  className="w-full rounded-xl border border-zinc-700 bg-zinc-900 px-2 py-2 text-sm text-white focus:border-emerald-500 focus:outline-none"
-                >
-                  <option value="">Todas</option>
-                  {airlines.map((a) => (
-                    <option key={a.code} value={a.code}>
-                      {a.nome}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-zinc-500">
-                  Programa
-                </label>
-                <select
-                  value={programa}
-                  onChange={(e) => setPrograma(e.target.value)}
-                  className="w-full rounded-xl border border-zinc-700 bg-zinc-900 px-2 py-2 text-sm text-white focus:border-emerald-500 focus:outline-none"
-                >
-                  <option value="">Qualquer</option>
-                  {PROGRAMAS.map((p) => (
-                    <option key={p} value={p}>
-                      {p}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
+            <button
+              type="button"
+              onClick={() => void buscar()}
+              disabled={!podeBuscar || carregando}
+              className="w-full rounded-xl bg-emerald-500 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-emerald-400 disabled:cursor-not-allowed disabled:bg-zinc-800 disabled:text-zinc-500"
+            >
+              {carregando ? 'Consultando a Amadeus…' : 'Buscar voos'}
+            </button>
+
+            {origem && origem.tipo !== 'aeroporto' && (
+              <p className="text-xs text-amber-500">
+                A origem precisa ser um aeroporto específico — a busca parte de um ponto só.
+              </p>
+            )}
           </div>
 
-          <ResultadoLista
-            resultados={visiveis}
-            total={resultados.length}
-            selecionado={selecionado}
-            onSelecionar={setSelecionado}
-            destino={destino}
-            temPrazo={Boolean(chegarAte)}
-          />
+          {falha && <Erro falha={falha} />}
+          {!falha && (
+            <Resultados
+              resposta={resposta}
+              carregando={carregando}
+              destino={destino}
+              selecionado={selecionado}
+              onSelecionar={setSelecionado}
+            />
+          )}
         </div>
 
         <div className="space-y-4 lg:sticky lg:top-20 lg:self-start">
           <RouteMap arcos={arcos} marcadores={marcadores} altura="h-[560px]" />
-          {foco && <DetalheItinerario avaliado={foco} chegarAte={chegarAte} />}
+          {foco && <Detalhe itinerario={foco} chegarAte={chegarAte} />}
         </div>
       </div>
-
-      <p className="mt-8 text-xs text-zinc-600">
-        Base de referência revisada em {ROUTES_REVISAO}. Durações e horários de chegada são
-        estimativas calculadas a partir da distância e do fuso de cada aeroporto — não são o horário
-        publicado da companhia. Confirme o voo antes de emitir.
-      </p>
     </div>
   );
 }
 
-function ResultadoLista({
-  resultados,
-  total,
+function Campo({
+  rotulo,
+  detalhe,
+  children,
+}: {
+  rotulo: string;
+  detalhe?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-zinc-500">
+        {rotulo} {detalhe && <span className="normal-case text-zinc-600">({detalhe})</span>}
+      </label>
+      {children}
+    </div>
+  );
+}
+
+function Erro({ falha }: { falha: Falha }) {
+  const semCredencial = falha.configurado === false;
+
+  return (
+    <div
+      className={`rounded-2xl border p-5 ${
+        semCredencial ? 'border-amber-600/50 bg-amber-500/5' : 'border-red-800 bg-red-950/30'
+      }`}
+    >
+      <h2 className="font-semibold text-white">
+        {semCredencial ? 'Fonte de dados não configurada' : 'A busca falhou'}
+      </h2>
+      <p className="mt-1 text-sm text-zinc-400">{falha.mensagem}</p>
+
+      {semCredencial && (
+        <div className="mt-3 space-y-2 text-sm text-zinc-400">
+          <p>
+            Crie uma chave gratuita em{' '}
+            <a
+              href="https://developers.amadeus.com"
+              target="_blank"
+              rel="noreferrer"
+              className="text-emerald-400 underline underline-offset-2"
+            >
+              developers.amadeus.com
+            </a>{' '}
+            e defina no ambiente:
+          </p>
+          <pre className="overflow-x-auto rounded-xl border border-zinc-800 bg-zinc-950 p-3 text-xs text-zinc-300">
+            {`AMADEUS_CLIENT_ID=...\nAMADEUS_CLIENT_SECRET=...\n# AMADEUS_HOSTNAME=production  # opcional`}
+          </pre>
+          <p className="text-xs text-zinc-500">
+            Sem as credenciais a tela não mostra rota nenhuma — de propósito. É melhor não responder
+            do que responder com dado que ninguém verificou.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Resultados({
+  resposta,
+  carregando,
+  destino,
   selecionado,
   onSelecionar,
-  destino,
-  temPrazo,
 }: {
-  resultados: Avaliado[];
-  total: number;
+  resposta: Resposta | null;
+  carregando: boolean;
+  destino: Alvo | null;
   selecionado: number;
   onSelecionar: (i: number) => void;
-  destino: Alvo | null;
-  temPrazo: boolean;
 }) {
-  if (!destino) {
+  if (carregando && !resposta) {
     return (
       <div className="rounded-2xl border border-zinc-800 p-6 text-sm text-zinc-400">
-        Escolha um destino — pode ser um aeroporto, um país inteiro ou uma região.
+        Consultando voos reais…
       </div>
     );
   }
 
-  if (resultados.length === 0) {
+  if (!resposta) {
     return (
       <div className="rounded-2xl border border-zinc-800 p-6 text-sm text-zinc-400">
-        {total > 0
-          ? 'Nenhum itinerário chega dentro do horário pedido. Tente sair mais cedo, aceitar mais uma parada ou afrouxar o limite.'
-          : 'Nenhum itinerário com esses filtros. Tente aceitar mais uma parada ou remover o filtro de companhia/programa.'}
+        Escolha origem, destino e data e clique em buscar.
       </div>
     );
   }
+
+  const { itinerarios, consultados, ignorados, falhas } = resposta;
 
   return (
     <div>
-      <div className="mb-2 flex items-baseline justify-between">
+      <div className="mb-2 flex items-baseline justify-between gap-3">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-zinc-400">
-          {resultados.length} itinerário{resultados.length > 1 ? 's' : ''} para {rotuloAlvo(destino)}
+          {itinerarios.length} voo{itinerarios.length === 1 ? '' : 's'}
+          {destino && ` para ${rotuloAlvo(destino)}`}
         </h2>
-        {temPrazo && total > resultados.length && (
-          <span className="text-xs text-zinc-600">{total - resultados.length} fora do prazo</span>
-        )}
+        <span className="text-xs text-zinc-600">
+          {resposta.fonte} · {resposta.ambiente}
+        </span>
       </div>
 
-      <ul className="max-h-[520px] space-y-2 overflow-auto pr-1">
-        {resultados.map((r, i) => (
-          <li key={[r.itinerario.segmentos[0].de, ...r.itinerario.segmentos.map((s) => s.para)].join('-')}>
-            <button
-              type="button"
-              onClick={() => onSelecionar(i)}
-              className={`w-full rounded-xl border p-3 text-left transition-colors ${
-                i === selecionado
-                  ? 'border-emerald-500 bg-emerald-500/10'
-                  : 'border-zinc-800 bg-zinc-900/40 hover:border-zinc-600'
-              }`}
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="font-mono text-sm text-white">
-                    {r.itinerario.segmentos[0].de}
-                    {r.itinerario.segmentos.map((s) => ` → ${s.para}`)}
-                  </div>
-                  <div className="mt-1 truncate text-xs text-zinc-500">
-                    {airportByIata.get(r.itinerario.destino)?.cidade} ·{' '}
-                    {r.itinerario.paradas === 0
-                      ? 'voo direto'
-                      : `${r.itinerario.paradas} parada${r.itinerario.paradas > 1 ? 's' : ''}`}
-                  </div>
-                </div>
-                <div className="shrink-0 text-right">
-                  <div className="font-mono text-sm text-emerald-400">
-                    {formatDuration(r.itinerario.minutosTotal)}
-                  </div>
-                  <div
-                    className={`text-xs ${r.dentroDoPrazo ? 'text-zinc-500' : 'text-amber-500'}`}
-                  >
-                    chega {formatHourMinute(r.chegada.minutos)}
-                    {r.chegada.diaSeguinte > 0 && `+${r.chegada.diaSeguinte}`}
-                  </div>
-                </div>
-              </div>
+      {(ignorados.length > 0 || falhas.length > 0) && (
+        <div className="mb-2 space-y-1 rounded-xl border border-zinc-800 bg-zinc-900/40 p-3 text-xs text-zinc-500">
+          <p>
+            Consultados: <span className="font-mono text-zinc-400">{consultados.join(', ')}</span>
+          </p>
+          {ignorados.length > 0 && (
+            <p>
+              Fora do limite desta busca:{' '}
+              <span className="font-mono">{ignorados.join(', ')}</span> — cada destino é uma chamada
+              à API, então a consulta é limitada de propósito.
+            </p>
+          )}
+          {falhas.map((f) => (
+            <p key={f.destino} className="text-amber-500">
+              {f.destino}: {f.motivo}
+            </p>
+          ))}
+        </div>
+      )}
 
-              <div className="mt-2 flex flex-wrap gap-1">
-                {[...new Set(r.itinerario.segmentos.flatMap((s) => s.companhias))]
-                  .slice(0, 5)
-                  .map((c) => (
+      {itinerarios.length === 0 ? (
+        <div className="rounded-2xl border border-zinc-800 p-6 text-sm text-zinc-400">
+          Nenhum voo atende a esses critérios nessa data. Tente aceitar mais uma parada, afrouxar o
+          horário de chegada ou mudar a data.
+        </div>
+      ) : (
+        <ul className="max-h-[520px] space-y-2 overflow-auto pr-1">
+          {itinerarios.map((it, i) => (
+            <li key={`${it.id}-${it.destino}`}>
+              <button
+                type="button"
+                onClick={() => onSelecionar(i)}
+                className={`w-full rounded-xl border p-3 text-left transition-colors ${
+                  i === selecionado
+                    ? 'border-emerald-500 bg-emerald-500/10'
+                    : 'border-zinc-800 bg-zinc-900/40 hover:border-zinc-600'
+                }`}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="font-mono text-sm text-white">
+                      {it.segmentos[0].de}
+                      {it.segmentos.map((s) => ` → ${s.para}`)}
+                    </div>
+                    <div className="mt-1 truncate text-xs text-zinc-500">
+                      {airportByIata.get(it.destino)?.cidade ?? it.destino} ·{' '}
+                      {it.paradas === 0 ? 'voo direto' : `${it.paradas} parada${it.paradas > 1 ? 's' : ''}`}
+                    </div>
+                  </div>
+                  <div className="shrink-0 text-right">
+                    <div className="font-mono text-sm text-white">
+                      {hora(it.segmentos[0].partida)} →{' '}
+                      {hora(it.segmentos[it.segmentos.length - 1].chegada)}
+                      {emDias(it.segmentos[0].partida, it.segmentos[it.segmentos.length - 1].chegada) >
+                        0 && (
+                        <sup className="text-amber-500">
+                          +
+                          {emDias(
+                            it.segmentos[0].partida,
+                            it.segmentos[it.segmentos.length - 1].chegada,
+                          )}
+                        </sup>
+                      )}
+                    </div>
+                    <div className="text-xs text-zinc-500">{formatDuration(it.duracaoMin)}</div>
+                  </div>
+                </div>
+
+                <div className="mt-2 flex flex-wrap items-center gap-1">
+                  {it.companhias.map((c) => (
                     <span
                       key={c}
                       className="rounded px-1.5 py-0.5 text-[10px] font-medium"
-                      style={{
-                        backgroundColor: `${airlineByCode.get(c)?.cor ?? '#71717a'}22`,
-                        color: airlineByCode.get(c)?.cor ?? '#a1a1aa',
-                      }}
+                      style={{ backgroundColor: `${corDaCompanhia(c)}22`, color: corDaCompanhia(c) }}
                     >
-                      {airlineByCode.get(c)?.nome ?? c}
+                      {nomeDaCompanhia(
+                        c,
+                        it.segmentos.find((s) => s.companhia === c)?.companhiaNome,
+                      )}
                     </span>
                   ))}
-              </div>
-            </button>
-          </li>
-        ))}
-      </ul>
+                  {it.preco && (
+                    <span className="ml-auto font-mono text-xs text-emerald-400">
+                      {it.preco.moeda}{' '}
+                      {it.preco.total.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}
+                    </span>
+                  )}
+                </div>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }
 
-function DetalheItinerario({
-  avaliado,
-  chegarAte,
-}: {
-  avaliado: Avaliado;
-  chegarAte: string;
-}) {
-  const { itinerario, chegada, dentroDoPrazo } = avaliado;
-  const destino = airportByIata.get(itinerario.destino)!;
+function Detalhe({ itinerario, chegarAte }: { itinerario: ItinerarioReal; chegarAte: string }) {
+  const destino = airportByIata.get(itinerario.destino);
+  const ultimo = itinerario.segmentos[itinerario.segmentos.length - 1];
+
+  const programas = programasDoItinerario(itinerario.companhias);
+  const foraDaCuradoria = temCompanhiaForaDaCuradoria(itinerario.companhias);
 
   return (
     <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-4">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h3 className="text-lg font-semibold">
-          {itinerario.segmentos[0].de} → {destino.cidade} ({destino.iata})
+          {itinerario.segmentos[0].de} → {destino?.cidade ?? itinerario.destino} (
+          {itinerario.destino})
         </h3>
         <span className="font-mono text-sm text-zinc-400">
-          {itinerario.kmTotal.toLocaleString('pt-BR')} km ·{' '}
-          {formatDuration(itinerario.minutosTotal)}
+          {formatDuration(itinerario.duracaoMin)}
+          {itinerario.preco &&
+            ` · ${itinerario.preco.moeda} ${itinerario.preco.total.toLocaleString('pt-BR', {
+              maximumFractionDigits: 0,
+            })}`}
         </span>
       </div>
 
       {chegarAte && (
-        <p className={`mt-1 text-sm ${dentroDoPrazo ? 'text-emerald-400' : 'text-amber-500'}`}>
-          Chega às {formatHourMinute(chegada.minutos)}
-          {chegada.diaSeguinte > 0 && ` do dia seguinte`} em {destino.cidade} —{' '}
-          {dentroDoPrazo ? `dentro do limite de ${chegarAte}` : `depois do limite de ${chegarAte}`}.
+        <p className="mt-1 text-sm text-emerald-400">
+          Chega às {hora(ultimo.chegada)} em {destino?.cidade ?? itinerario.destino} — dentro do
+          limite de {chegarAte}.
         </p>
       )}
 
-      <ol className="mt-3 space-y-2">
-        {itinerario.segmentos.map((s, i) => (
-          <li key={`${s.de}-${s.para}`}>
-            <div className="flex items-baseline justify-between gap-3 text-sm">
-              <span className="font-mono text-white">
-                {s.de} → {s.para}
-              </span>
-              <span className="text-zinc-500">
-                {formatDuration(s.minutos)} · {s.km.toLocaleString('pt-BR')} km
-              </span>
-            </div>
-            <div className="mt-0.5 flex flex-wrap gap-x-2 text-xs text-zinc-500">
-              {s.companhias.map((c) => (
-                <Link
-                  key={c}
-                  href={`/rotas/cia/${c}`}
-                  className="hover:text-white"
-                  style={{ color: airlineByCode.get(c)?.cor }}
-                >
-                  {airlineByCode.get(c)?.nome ?? c}
-                </Link>
-              ))}
-            </div>
+      <ol className="mt-3 space-y-3">
+        {itinerario.segmentos.map((s, i) => {
+          const proximo = itinerario.segmentos[i + 1];
+          const esperaMin = proximo
+            ? Math.round(
+                (Date.parse(`${proximo.partida}Z`) - Date.parse(`${s.chegada}Z`)) / 60_000,
+              )
+            : 0;
 
-            {itinerario.conexoes[i] && (
-              <div className="my-2 border-l-2 border-dashed border-zinc-700 pl-3 text-xs text-zinc-500">
-                Conexão em {itinerario.conexoes[i].iata} · mínimo{' '}
-                {formatDuration(itinerario.conexoes[i].minutos)}
-                {itinerario.conexoes[i].trocaSemAcordo && (
-                  <span className="text-amber-500">
-                    {' '}
-                    — companhias sem acordo, bagagem provavelmente não é despachada até o destino
-                  </span>
-                )}
+          return (
+            <li key={`${s.voo}-${s.de}`}>
+              <div className="flex items-baseline justify-between gap-3 text-sm">
+                <span className="font-mono text-white">
+                  {hora(s.partida)} {s.de} → {hora(s.chegada)} {s.para}
+                </span>
+                <span className="text-zinc-500">{formatDuration(s.duracaoMin)}</span>
               </div>
-            )}
-          </li>
-        ))}
+              <div className="mt-0.5 text-xs text-zinc-500">
+                <span style={{ color: corDaCompanhia(s.companhia) }}>
+                  {nomeDaCompanhia(s.companhia, s.companhiaNome)}
+                </span>{' '}
+                {s.voo}
+                {s.aeronave && ` · ${s.aeronave}`}
+                {s.operadoPor && ` · operado por ${nomeDaCompanhia(s.operadoPor)}`}
+              </div>
+
+              {proximo && (
+                <div className="my-2 border-l-2 border-dashed border-zinc-700 pl-3 text-xs text-zinc-500">
+                  Conexão em {s.para} · espera de {formatDuration(esperaMin)}
+                </div>
+              )}
+            </li>
+          );
+        })}
       </ol>
 
       <div className="mt-4 border-t border-zinc-800 pt-3">
-        <span className="text-xs font-medium uppercase tracking-wide text-zinc-500">
-          Emite com
-        </span>
-        {itinerario.programas.length > 0 ? (
-          <div className="mt-1 flex flex-wrap gap-1">
-            {itinerario.programas.map((p) => (
-              <span
-                key={p}
-                className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs text-emerald-400"
-              >
-                {p}
-              </span>
-            ))}
-          </div>
+        <span className="text-xs font-medium uppercase tracking-wide text-zinc-500">Emite com</span>
+        {programas.length > 0 ? (
+          <>
+            <div className="mt-1 flex flex-wrap gap-1">
+              {programas.map((p) => (
+                <span
+                  key={p}
+                  className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs text-emerald-400"
+                >
+                  {p}
+                </span>
+              ))}
+            </div>
+            <p className="mt-2 text-[11px] text-zinc-600">
+              Parcerias de emissão são curadoria editorial, revisada em {PROGRAMAS_REVISAO} — o voo e
+              o horário acima vêm da Amadeus.
+            </p>
+          </>
         ) : (
           <p className="mt-1 text-xs text-zinc-500">
-            Nenhum programa único cobre os dois trechos — provavelmente exige duas emissões
-            separadas.
+            {foraDaCuradoria
+              ? 'Alguma companhia deste trajeto está fora da nossa curadoria de programas — não dá para afirmar nada sobre emissão em milhas.'
+              : 'Nenhum programa único cobre todos os trechos; provavelmente exige duas emissões separadas.'}
           </p>
         )}
       </div>

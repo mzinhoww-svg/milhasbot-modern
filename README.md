@@ -49,60 +49,62 @@ Este projeto nasceu do **Prompt de Engenharia Reversa Completa** do site [milhas
 - Bônus de transferência ativos
 - Transferir para ALL Accor
 
-### Fase 6 - Mapa de Rotas das Américas (P0)
-Alternativa ao FlightConnections, com recorte deliberado nas **Américas** e nas
-**principais companhias** — é o recorte que torna possível entregar o que o
-FlightConnections não entrega.
+### Fase 6 - Busca de Voos nas Américas (P0)
+Alternativa ao FlightConnections com recorte nas **Américas**. Rotas, horários e
+preços vêm da **Amadeus Self-Service API** — nada de malha escrita à mão.
 
-- **Mapa de rotas** (`/rotas`) — 2.043 rotas de 19 companhias entre 176 aeroportos
-- **Página por companhia** (`/rotas/cia/[code]`) — malha completa, alcance e parceiros
-- **Página por aeroporto** (`/rotas/aeroporto/[iata]`) — destinos diretos por região
+- **Busca de voos** (`/rotas`) — origem, destino por aeroporto/país/região, data
+  e filtro de horário de chegada
+- **Malha direta por aeroporto** (`/rotas/aeroporto/[iata]`) — destinos sem
+  escala segundo a Amadeus
 
-**O que ele faz melhor:**
+**O que ele faz melhor que o FlightConnections:**
 
 | | FlightConnections | Aqui |
 |---|---|---|
-| Mapa | tiles externos, carrega a cada interação | SVG pré-projetado no bundle, zero requisição |
+| Mapa | tiles externos, recarrega a cada interação | SVG pré-projetado no bundle, zero requisição |
 | Destino | um aeroporto por vez | aeroporto, **país** ou **região inteira** |
-| Conexões | foco em voo direto | direto, 1 e 2 paradas com tempo mínimo de conexão |
-| Horário | — | **"chegar até"** com fuso real de cada aeroporto |
-| Milhas | — | **qual programa emite** cada itinerário inteiro |
-| Busca | ida e volta ao servidor | grafo inteiro em memória, resposta em milissegundos |
+| Horário | — | **"chegar até"** comparado com o horário publicado da companhia |
+| Milhas | — | **qual programa emite** o itinerário inteiro |
 
-**Como funciona por dentro:**
-- `lib/flights/land.ts` — contorno das Américas derivado do Natural Earth (110m),
-  simplificado com Douglas-Peucker e **pré-projetado** em Mercator. É um arquivo
-  gerado: o mapa não faz nenhuma requisição externa.
-- `lib/flights/geo.ts` — projeção, distância ortodrômica e traçado dos arcos pelo
-  círculo máximo (uma reta no Mercator seria a rota errada).
-- `lib/flights/network.ts` — grafo de ~180 nós montado no import; busca direto,
-  1 e 2 paradas com corte por desvio máximo sobre a rota direta.
-- `lib/flights/time.ts` — fuso IANA por aeroporto, com horário de verão resolvido
-  pelo próprio runtime via `Intl`.
-- `lib/flights/airlines.ts` — o diferencial: para cada companhia, **quais programas
-  emitem**. Um itinerário só é emissível num programa se *todos* os trechos forem.
+#### Procedência de cada dado
 
-**Honestidade sobre os dados:** é uma base curada de referência para planejamento,
-não o inventário ao vivo das companhias. Durações e horários de chegada são
-estimados a partir da distância — não são o horário publicado. A tela diz isso.
+Esta é a parte que importa: o produto só mostra o que tem fonte.
 
-**Exemplo do que ele responde** — sair de Atlanta às 8h e chegar ao Brasil até 17h:
+| Dado | Fonte | Natureza |
+|---|---|---|
+| Voos, horários, preços | Amadeus Self-Service API | operacional, ao vivo |
+| Aeroportos, coordenadas | [OurAirports](https://davidmegginson.github.io/ourairports-data/airports.csv) (domínio público) | gerado em `lib/flights/airports.data.ts` |
+| Fuso de cada aeroporto | `tz-lookup` sobre as coordenadas | derivado |
+| Nome dos países | `Intl.DisplayNames` em pt-BR | derivado |
+| Contorno do mapa | Natural Earth 110m, simplificado e pré-projetado | gerado em `lib/flights/land.ts` |
+| Aliança e programas de milhas | curadoria editorial própria, datada | **a única parte sem API** |
 
-```
-$ npm run flights:consulta -- ATL Brasil 17:00
+Sem `AMADEUS_CLIENT_ID`/`AMADEUS_CLIENT_SECRET` a busca **não retorna rota
+nenhuma** e a tela explica como configurar. É deliberado: melhor não responder
+do que responder com dado que ninguém verificou.
 
-ATL → Brasil · saindo 08:00 (hora local de Atlanta) · chegar até 17:00
-ATL → PTY → MAO   8h58   chega 16:58   Manaus   Aeroplan, ConnectMiles, LifeMiles
-1 de 12 cidades chegam até 17:00
+#### Configuração
+
+```bash
+# chave gratuita em https://developers.amadeus.com
+AMADEUS_CLIENT_ID="..."
+AMADEUS_CLIENT_SECRET="..."
+AMADEUS_HOSTNAME="test"   # ou "production" quando o app for aprovado
 ```
 
-E para GRU especificamente: saindo 06:20 chega 17:00 em ponto; saindo 06:30 já não dá.
+O ambiente `test` tem cota mensal baixa e malha reduzida — por isso a busca é
+sempre explícita (nada dispara ao abrir a página), as respostas são cacheadas no
+servidor (24h para malha, 3h para ofertas) e a consulta por país é limitada a
+poucos destinos por vez. O que ficou de fora do limite aparece declarado na
+tela; truncar em silêncio faria o resultado parecer completo sem ser.
 
-Scripts:
-- `npm run flights:validate` — checa IATAs órfãos, fusos inválidos, coordenadas
-  fora da janela do mapa e distâncias contra valores conhecidos
-- `npm run flights:consulta -- <ORIGEM> <destino> [chegar-até] [partida]` — a mesma
-  busca da tela pela linha de comando
+#### Scripts
+
+- `npm run flights:aeroportos` — regera a base de aeroportos do OurAirports
+- `npm run flights:checar` — diagnostica a integração com a Amadeus fora do Next,
+  com erro legível para credencial, cota ou rede
+  (`node scripts/checar-amadeus.mjs ATL GRU 2026-09-15`)
 
 ### Fase 4 - Cartões + Na Viagem (P1/P2)
 - Anuidade Líquida do Cartão

@@ -41,13 +41,13 @@ const navGroups: { label: string; items: { href: string; label: string }[] }[] =
     ],
   },
   {
-    label: 'Rotas',
+    label: 'Voos',
     items: [
-      { href: '/rotas', label: 'Mapa de Rotas' },
-      { href: '/rotas/aeroporto/GRU', label: 'Voos diretos de GRU' },
-      { href: '/rotas/aeroporto/MIA', label: 'Voos diretos de MIA' },
-      { href: '/rotas/cia/LA', label: 'Malha da LATAM' },
-      { href: '/rotas/cia/CM', label: 'Malha da Copa' },
+      { href: '/rotas', label: 'Buscar voos' },
+      { href: '/rotas/aeroporto/GRU', label: 'Diretos de GRU' },
+      { href: '/rotas/aeroporto/GIG', label: 'Diretos do GIG' },
+      { href: '/rotas/aeroporto/MIA', label: 'Diretos de MIA' },
+      { href: '/rotas/aeroporto/PTY', label: 'Diretos do Panamá' },
     ],
   },
   {

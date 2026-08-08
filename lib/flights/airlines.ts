@@ -1,11 +1,23 @@
 /**
- * Companhias aéreas cobertas pelo mapa de rotas e os programas de milhas que
- * conseguem emitir cada uma.
+ * Alianças e programas de milhas por companhia.
  *
- * `programas` é o que diferencia esta base de um mapa de rotas comum: saber que
- * existe voo direto só resolve metade do problema de quem viaja com milhas — a
- * outra metade é saber com qual programa dá para emitir aquele trecho.
+ * Atenção ao que este arquivo é e ao que não é.
+ *
+ * Rotas e horários do produto vêm da Amadeus — dado operacional, com fonte.
+ * Isto aqui é outra coisa: conteúdo editorial curado sobre aliança e sobre
+ * quais programas emitem cada companhia. Não há API pública que dê isso, e é
+ * justamente o que interessa a quem viaja com milhas: saber que existe voo
+ * direto resolve metade do problema; a outra metade é saber com qual programa
+ * dá para emitir.
+ *
+ * Consequências práticas:
+ * - a cobertura é parcial de propósito (companhias relevantes das Américas);
+ * - companhia que a Amadeus devolver e não constar aqui aparece com o nome que
+ *   a própria Amadeus informa e sem dado de programa — nunca com dado chutado;
+ * - a revisão é manual e datada, como o resto do conteúdo editorial do site.
  */
+
+export const PROGRAMAS_REVISAO = 'julho/2026';
 
 export type Alianca = 'star' | 'oneworld' | 'skyteam' | 'nenhuma';
 
@@ -219,3 +231,47 @@ export function getAirline(code: string): Airline | undefined {
 export const PROGRAMAS = Array.from(
   new Set(airlines.flatMap((a) => a.programas)),
 ).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+
+/** Cor de fallback para companhia fora da curadoria. */
+export const COR_DESCONHECIDA = '#a1a1aa';
+
+export function corDaCompanhia(codigo: string): string {
+  return airlineByCode.get(codigo)?.cor ?? COR_DESCONHECIDA;
+}
+
+/**
+ * Nome de exibição: prefere a curadoria, cai para o dicionário da Amadeus e,
+ * em último caso, mostra o próprio código — nunca inventa.
+ */
+export function nomeDaCompanhia(codigo: string, nomeDaApi?: string): string {
+  const curado = airlineByCode.get(codigo)?.nome;
+  if (curado) return curado;
+  if (!nomeDaApi) return codigo;
+
+  // A Amadeus devolve o nome em caixa alta ("DELTA AIR LINES").
+  return nomeDaApi
+    .toLocaleLowerCase('pt-BR')
+    .replace(/(^|[\s/-])(\p{L})/gu, (_, antes, letra: string) => antes + letra.toLocaleUpperCase('pt-BR'));
+}
+
+/**
+ * Programas que emitem todos os trechos de um itinerário.
+ *
+ * Devolve lista vazia — e não um palpite — quando alguma companhia do trajeto
+ * está fora da curadoria.
+ */
+export function programasDoItinerario(codigos: string[]): string[] {
+  if (codigos.length === 0) return [];
+
+  const porCompanhia = codigos.map((c) => airlineByCode.get(c)?.programas);
+  if (porCompanhia.some((p) => p === undefined)) return [];
+
+  return (porCompanhia as string[][])
+    .reduce((comuns, programas) => comuns.filter((p) => programas.includes(p)))
+    .sort((a, b) => a.localeCompare(b, 'pt-BR'));
+}
+
+/** Alguma companhia do trajeto está fora da curadoria de programas? */
+export function temCompanhiaForaDaCuradoria(codigos: string[]): boolean {
+  return codigos.some((c) => !airlineByCode.has(c));
+}

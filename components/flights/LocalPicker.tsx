@@ -1,8 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { REGIOES, airports } from '@/lib/flights/airports';
-import { type Alvo, aeroportosPorMovimento, paises, rotuloAlvo } from '@/lib/flights/network';
+import { type Alvo, REGIOES, airports, paises, rotuloAlvo } from '@/lib/flights/airports';
 
 interface Opcao {
   alvo: Alvo;
@@ -18,16 +17,14 @@ const semAcento = (texto: string) =>
   texto.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 
 function construirOpcoes(permitirGrupos: boolean): Opcao[] {
-  const rotasPorIata = new Map(
-    aeroportosPorMovimento.map(({ aeroporto, rotas }) => [aeroporto.iata, rotas]),
-  );
-
   const deAeroportos: Opcao[] = airports.map((a) => ({
     alvo: { tipo: 'aeroporto', valor: a.iata },
     titulo: `${a.cidade} · ${a.iata}`,
     detalhe: `${a.nome} — ${a.pais}`,
     busca: semAcento(`${a.iata} ${a.cidade} ${a.nome} ${a.pais}`),
-    peso: rotasPorIata.get(a.iata) ?? 0,
+    // Sem malha local para medir movimento, o porte do OurAirports é o melhor
+    // desempate: são 1.094 aeroportos, e quem digita "san" quer o maior.
+    peso: a.grande ? 100 : 0,
   }));
 
   if (!permitirGrupos) return deAeroportos;

@@ -1,6 +1,5 @@
 import Link from 'next/link';
-import { airlines } from '@/lib/flights/airlines';
-import { TOTAL_AEROPORTOS, TOTAL_ROTAS } from '@/lib/flights/network';
+import { airports, paises } from '@/lib/flights/airports';
 
 interface Ferramenta {
   href: string;
@@ -183,17 +182,17 @@ export default function Home() {
           className="group mb-14 block rounded-2xl border border-emerald-500/40 bg-emerald-500/5 p-8 transition-colors hover:border-emerald-500"
         >
           <span className="text-sm font-medium uppercase tracking-wider text-emerald-400">
-            Novo • Mapa de Rotas
+            Novo • Busca de Voos
           </span>
           <h2 className="mt-2 text-3xl font-semibold group-hover:text-emerald-400">
-            Todas as rotas das Américas em um mapa
+            Voos reais das Américas, com horário de verdade
           </h2>
           <p className="mt-3 max-w-2xl text-zinc-400">
-            {TOTAL_ROTAS.toLocaleString('pt-BR')} rotas de {airlines.length} companhias entre{' '}
-            {TOTAL_AEROPORTOS} aeroportos. Busque por país ou região inteira, filtre por horário de
-            chegada e veja com qual programa dá para emitir cada trecho.
+            {airports.length.toLocaleString('pt-BR')} aeroportos em {paises.length} países. Busque
+            por país ou região inteira, filtre pelo horário em que precisa chegar e veja com qual
+            programa dá para emitir. Rotas, horários e preços vêm da API da Amadeus.
           </p>
-          <div className="mt-4 text-sm text-emerald-400">Abrir o mapa →</div>
+          <div className="mt-4 text-sm text-emerald-400">Abrir a busca →</div>
         </Link>
 
         {fases.map((fase) => (
