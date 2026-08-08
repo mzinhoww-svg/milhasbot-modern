@@ -190,7 +190,7 @@ export default function Home() {
           <p className="mt-3 max-w-2xl text-zinc-400">
             {airports.length.toLocaleString('pt-BR')} aeroportos em {paises.length} países. Busque
             por país ou região inteira, filtre pelo horário em que precisa chegar e veja com qual
-            programa dá para emitir. Rotas, horários e preços vêm da API da Amadeus.
+            programa dá para emitir. Tarifas, horários e preços vêm do Travelpayouts.
           </p>
           <div className="mt-4 text-sm text-emerald-400">Abrir a busca →</div>
         </Link>

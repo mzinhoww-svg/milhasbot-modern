@@ -2,18 +2,18 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import RotasExplorer from './RotasExplorer';
 import { FONTE, airports, paises } from '@/lib/flights/airports';
-import { amadeusConfigurado, ambienteAmadeus } from '@/lib/flights/amadeus/client';
+import { travelpayoutsConfigurado } from '@/lib/flights/travelpayouts/client';
 
 export const metadata: Metadata = {
   title: 'Busca de voos nas Américas',
   description:
-    'Voos e horários reais entre aeroportos das Américas. Busque por país ou região inteira, filtre pelo horário em que precisa chegar e veja com qual programa de milhas dá para emitir.',
+    'Tarifas e horários reais entre aeroportos das Américas. Busque por país ou região inteira, filtre pelo horário em que precisa chegar e veja com qual programa de milhas dá para emitir.',
 };
 
 const DESTAQUES = ['GRU', 'GIG', 'BSB', 'MIA', 'JFK', 'ATL', 'MEX', 'PTY', 'BOG', 'SCL', 'EZE', 'LIM'];
 
 export default function RotasPage() {
-  const configurado = amadeusConfigurado();
+  const configurado = travelpayoutsConfigurado();
   const grandes = airports.filter((a) => a.grande).length;
 
   return (
@@ -21,7 +21,7 @@ export default function RotasPage() {
       <RotasExplorer />
 
       <section className="mx-auto max-w-7xl px-6 pb-16">
-        <h2 className="mb-3 text-lg font-semibold">Malha direta por aeroporto</h2>
+        <h2 className="mb-3 text-lg font-semibold">Destinos baratos por aeroporto</h2>
         <div className="flex flex-wrap gap-2">
           {DESTAQUES.map((iata) => (
             <Link
@@ -36,9 +36,9 @@ export default function RotasPage() {
 
         <div className="mt-8 space-y-2 border-t border-zinc-800 pt-6 text-sm text-zinc-500">
           <p>
-            <strong className="text-zinc-300">Voos e horários:</strong> Amadeus Self-Service API
-            {configurado ? ` (ambiente ${ambienteAmadeus()})` : ' — credenciais não configuradas'}.
-            É a fonte de tudo que aparece como rota, horário e preço.
+            <strong className="text-zinc-300">Tarifas e horários:</strong> Travelpayouts (Aviasales)
+            {configurado ? '' : ' — token não configurado'}. É a fonte de tudo que aparece como voo,
+            horário e preço, com link direto para a reserva.
           </p>
           <p>
             <strong className="text-zinc-300">Aeroportos:</strong> {airports.length} aeroportos das
@@ -56,7 +56,7 @@ export default function RotasPage() {
           </p>
           <p>
             <strong className="text-zinc-300">Programas de milhas:</strong> curadoria editorial
-            própria — é a única parte que não vem de API, porque não existe uma que dê isso.
+            própria — a única parte que não vem de API, porque não existe uma que dê isso.
           </p>
         </div>
       </section>

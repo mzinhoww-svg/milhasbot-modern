@@ -50,13 +50,14 @@ Este projeto nasceu do **Prompt de Engenharia Reversa Completa** do site [milhas
 - Transferir para ALL Accor
 
 ### Fase 6 - Busca de Voos nas Américas (P0)
-Alternativa ao FlightConnections com recorte nas **Américas**. Rotas, horários e
-preços vêm da **Amadeus Self-Service API** — nada de malha escrita à mão.
+Alternativa ao FlightConnections com recorte nas **Américas**. Tarifas, horários
+e preços vêm da **Data API do Travelpayouts (Aviasales)** — nada de malha
+escrita à mão.
 
-- **Busca de voos** (`/rotas`) — origem, destino por aeroporto/país/região, data
-  e filtro de horário de chegada
-- **Malha direta por aeroporto** (`/rotas/aeroporto/[iata]`) — destinos sem
-  escala segundo a Amadeus
+- **Busca de voos** (`/rotas`) — origem, destino por aeroporto/país/região,
+  filtro de horário de chegada, com preço e link de reserva
+- **Destinos baratos por aeroporto** (`/rotas/aeroporto/[iata]`) — para onde
+  voar barato saindo de um aeroporto
 
 **O que ele faz melhor que o FlightConnections:**
 
@@ -64,47 +65,49 @@ preços vêm da **Amadeus Self-Service API** — nada de malha escrita à mão.
 |---|---|---|
 | Mapa | tiles externos, recarrega a cada interação | SVG pré-projetado no bundle, zero requisição |
 | Destino | um aeroporto por vez | aeroporto, **país** ou **região inteira** |
-| Horário | — | **"chegar até"** comparado com o horário publicado da companhia |
-| Milhas | — | **qual programa emite** o itinerário inteiro |
+| Horário | — | **"chegar até"** com partida real + duração do voo |
+| Preço | — | tarifa real com **link de reserva** (afiliado) |
+| Milhas | — | **qual programa emite** a companhia |
 
 #### Procedência de cada dado
 
-Esta é a parte que importa: o produto só mostra o que tem fonte.
+O produto só mostra o que tem fonte.
 
 | Dado | Fonte | Natureza |
 |---|---|---|
-| Voos, horários, preços | Amadeus Self-Service API | operacional, ao vivo |
+| Voos, horários, preços, link | Travelpayouts (Aviasales) Data API | operacional, cache real |
 | Aeroportos, coordenadas | [OurAirports](https://davidmegginson.github.io/ourairports-data/airports.csv) (domínio público) | gerado em `lib/flights/airports.data.ts` |
 | Fuso de cada aeroporto | `tz-lookup` sobre as coordenadas | derivado |
-| Nome dos países | `Intl.DisplayNames` em pt-BR | derivado |
 | Contorno do mapa | Natural Earth 110m, simplificado e pré-projetado | gerado em `lib/flights/land.ts` |
-| Aliança e programas de milhas | curadoria editorial própria, datada | **a única parte sem API** |
+| Priorização de hubs, aliança, programas de milhas | curadoria editorial datada | **as partes sem API** |
 
-Sem `AMADEUS_CLIENT_ID`/`AMADEUS_CLIENT_SECRET` a busca **não retorna rota
-nenhuma** e a tela explica como configurar. É deliberado: melhor não responder
-do que responder com dado que ninguém verificou.
+Sem `TRAVELPAYOUTS_TOKEN` a busca **não retorna rota nenhuma** e a tela explica
+como configurar. É deliberado: melhor não responder do que responder com dado
+que ninguém verificou.
 
 #### Configuração
 
 ```bash
-# chave gratuita em https://developers.amadeus.com
-AMADEUS_CLIENT_ID="..."
-AMADEUS_CLIENT_SECRET="..."
-AMADEUS_HOSTNAME="test"   # ou "production" quando o app for aprovado
+# token gratuito no painel do Travelpayouts (aba de desenvolvedor)
+TRAVELPAYOUTS_TOKEN="..."
+# marker = ID de parceiro; opcional para funcionar, necessário para os links
+# de reserva gerarem comissão de afiliado
+TRAVELPAYOUTS_MARKER="..."
 ```
 
-O ambiente `test` tem cota mensal baixa e malha reduzida — por isso a busca é
-sempre explícita (nada dispara ao abrir a página), as respostas são cacheadas no
-servidor (24h para malha, 3h para ofertas) e a consulta por país é limitada a
-poucos destinos por vez. O que ficou de fora do limite aparece declarado na
-tela; truncar em silêncio faria o resultado parecer completo sem ser.
+A Data API tem tarifa em cache para datas esparsas, então uma data fixa quase
+sempre vem vazia — por isso o campo de data começa vazio (melhores tarifas por
+rota) e serve para estreitar. A busca é sempre explícita, as respostas são
+cacheadas no servidor (3h), e a consulta por país prioriza os portões de entrada
+(`lib/flights/hubs.ts`) antes de gastar cota em regionais. O que fica fora do
+limite aparece declarado na tela.
 
 #### Scripts
 
 - `npm run flights:aeroportos` — regera a base de aeroportos do OurAirports
-- `npm run flights:checar` — diagnostica a integração com a Amadeus fora do Next,
-  com erro legível para credencial, cota ou rede
-  (`node scripts/checar-amadeus.mjs ATL GRU 2026-09-15`)
+- `npm run flights:checar` — diagnostica o token do Travelpayouts fora do Next,
+  com erro legível para token, cota ou rede
+  (`node scripts/checar-travelpayouts.mjs ATL GRU`)
 
 ### Fase 4 - Cartões + Na Viagem (P1/P2)
 - Anuidade Líquida do Cartão

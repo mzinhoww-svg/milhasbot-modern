@@ -11,7 +11,7 @@
     "db:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",
     "flights:aeroportos": "node scripts/gerar-aeroportos.mjs",
-    "flights:checar": "node scripts/checar-amadeus.mjs"
+    "flights:checar": "node scripts/checar-travelpayouts.mjs"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
