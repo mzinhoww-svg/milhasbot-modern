@@ -56,8 +56,7 @@ não óbvio (MSP→BNA→ATL em vez do MSP→ATL direto lotado). A busca abre **
 opções diversas**, não só o caminho mais curto.
 
 - **Rotas criativas** (`/rotas`) — acha caminhos de até 3 voos por hubs
-  alternativos, com **troca de aeroporto na mesma cidade** (GRU↝CGH por terra) e
-  filtro de horário de chegada
+  alternativos por hubs não óbvios (só voos) e filtro de horário de chegada
 - **Voos diretos por aeroporto** (`/rotas/aeroporto/[iata]`) — a malha direta
   real de cada aeroporto
 
@@ -76,7 +75,7 @@ opções diversas**, não só o caminho mais curto.
 | Malha de voos diretos (quem voa cada trecho) | [OpenFlights](https://raw.githubusercontent.com/jpatokal/openflights/master/data/routes.dat) | gerado em `lib/flights/routes.data.ts` |
 | Aeroportos, coordenadas, cidade | [OurAirports](https://davidmegginson.github.io/ourairports-data/airports.csv) | gerado em `lib/flights/airports.data.ts` |
 | Fuso de cada aeroporto | `tz-lookup` sobre as coordenadas | derivado |
-| Horários das rotas criativas | distância + tempos padrão de conexão/traslado | **estimativa, marcada como tal** |
+| Horários das rotas criativas | distância + tempos padrão de conexão | **estimativa, marcada como tal** |
 | Tarifa e link de reserva | Travelpayouts (Aviasales), sob demanda por trecho | operacional, opcional |
 | Aliança e programas de milhas | curadoria editorial datada | as partes sem API |
 

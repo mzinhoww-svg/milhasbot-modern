@@ -12,7 +12,6 @@ import {
 import { formatDuration } from '@/lib/flights/geo';
 
 interface Passo {
-  tipo: 'voo' | 'traslado';
   de: string;
   para: string;
   companhias: string[];
@@ -26,7 +25,6 @@ interface Itinerario {
   destino: string;
   conexoes: string[];
   voos: number;
-  traslados: number;
   kmTotal: number;
   minutosTotal: number;
   companhiasUnicas: string[];
@@ -50,7 +48,6 @@ export default function RotasExplorer() {
   const [partida, setPartida] = useState('13:00');
   const [chegarAte, setChegarAte] = useState('');
   const [maxVoos, setMaxVoos] = useState(3);
-  const [traslado, setTraslado] = useState(true);
   const [selecionado, setSelecionado] = useState(0);
 
   const [resposta, setResposta] = useState<Resposta | null>(null);
@@ -70,7 +67,6 @@ export default function RotasExplorer() {
       alvo: `${destino.tipo}:${destino.valor}`,
       partida,
       maxVoos: String(maxVoos),
-      traslado: traslado ? '1' : '0',
     });
     if (chegarAte) params.set('chegarAte', chegarAte);
 
@@ -90,7 +86,7 @@ export default function RotasExplorer() {
     } finally {
       setCarregando(false);
     }
-  }, [origemIata, destino, partida, chegarAte, maxVoos, traslado]);
+  }, [origemIata, destino, partida, chegarAte, maxVoos]);
 
   const itinerarios = useMemo(() => resposta?.itinerarios ?? [], [resposta]);
   const foco = itinerarios[Math.min(selecionado, itinerarios.length - 1)];
@@ -106,14 +102,12 @@ export default function RotasExplorer() {
     }
     for (const it of itinerarios.slice(0, 12)) {
       for (const p of it.passos) {
-        if (p.tipo === 'voo') arcos.push({ de: p.de, para: p.para, cor: '#3f3f46' });
+        arcos.push({ de: p.de, para: p.para, cor: '#3f3f46' });
       }
     }
     if (foco) {
       for (const p of foco.passos) {
-        if (p.tipo === 'voo') {
-          arcos.push({ de: p.de, para: p.para, cor: corDaCompanhia(p.companhias[0]), destaque: true });
-        }
+        arcos.push({ de: p.de, para: p.para, cor: corDaCompanhia(p.companhias[0]), destaque: true });
       }
       marcadores.push({ iata: foco.origem, tipo: 'origem' });
       for (const c of foco.conexoes) marcadores.push({ iata: c, tipo: 'conexao' });
@@ -130,8 +124,8 @@ export default function RotasExplorer() {
         <h1 className="text-4xl font-bold tracking-tight">Rotas Criativas nas Américas</h1>
         <p className="mt-2 max-w-3xl text-zinc-400">
           Feito para viagem de staff: quando o voo direto está cheio, mostra os caminhos
-          alternativos por hubs não óbvios — inclusive trocando de aeroporto na mesma cidade — e diz
-          se dá para chegar no horário. Rotas reais do OpenFlights; horários estimados.
+          alternativos por hubs não óbvios e diz se dá para chegar no horário. Só voos — rotas reais
+          do OpenFlights; horários estimados.
         </p>
       </header>
 
@@ -190,16 +184,6 @@ export default function RotasExplorer() {
               </div>
             </div>
 
-            <label className="flex items-center gap-2 text-xs text-zinc-400">
-              <input
-                type="checkbox"
-                checked={traslado}
-                onChange={(e) => setTraslado(e.target.checked)}
-                className="accent-emerald-500"
-              />
-              Permitir trocar de aeroporto na mesma cidade (ex.: GRU → CGH por terra)
-            </label>
-
             <button
               type="button"
               onClick={() => void buscar()}
@@ -241,7 +225,7 @@ export default function RotasExplorer() {
 
       <p className="mx-auto mt-8 max-w-3xl text-xs text-zinc-600">
         Rotas da malha do OpenFlights (voos diretos reais por companhia). Os horários são estimados a
-        partir da distância e de tempos padrão de conexão e traslado — servem para comparar
+        partir da distância e de tempos padrão de conexão — servem para comparar
         viabilidade, não são o horário publicado. Confirme disponibilidade com a companhia.
       </p>
     </div>
@@ -260,7 +244,7 @@ function Campo({ rotulo, detalhe, children }: { rotulo: string; detalhe?: string
 }
 
 function rotaTexto(it: Itinerario): string {
-  return [it.origem, ...it.passos.map((p) => (p.tipo === 'traslado' ? `↝${p.para}` : p.para))].join(' → ');
+  return [it.origem, ...it.passos.map((p) => p.para)].join(' → ');
 }
 
 function Resultados({
@@ -328,7 +312,7 @@ function Resultados({
                     <div className="truncate font-mono text-sm text-white">{rotaTexto(it)}</div>
                     <div className="mt-1 text-xs text-zinc-500">
                       {it.voos === 1 ? 'voo direto' : `${it.voos} voos`}
-                      {it.traslados > 0 && ` · troca de aeroporto`}
+                      {it.conexoes.length > 0 && ` · via ${it.conexoes.join(', ')}`}
                     </div>
                   </div>
                   <div className="shrink-0 text-right">
@@ -411,33 +395,22 @@ function Detalhe({ it, chegarAte }: { it: Itinerario; chegarAte: string }) {
       <ol className="mt-3 space-y-2">
         {it.passos.map((p, i) => (
           <li key={`${p.de}-${p.para}-${i}`}>
-            {p.tipo === 'traslado' ? (
-              <div className="flex items-baseline justify-between gap-3 text-sm text-amber-500">
-                <span className="font-mono">
-                  {p.de} ↝ {p.para}
+            <div className="flex items-baseline justify-between gap-3 text-sm">
+              <span className="font-mono text-white">
+                {p.de} → {p.para}
+              </span>
+              <span className="text-zinc-500">
+                ~{formatDuration(p.minutos)} · {p.km.toLocaleString('pt-BR')} km
+              </span>
+            </div>
+            <div className="mt-0.5 flex flex-wrap gap-x-2 text-xs text-zinc-500">
+              {p.companhias.slice(0, 6).map((c) => (
+                <span key={c} style={{ color: corDaCompanhia(c) }}>
+                  {nomeDaCompanhia(c)}
                 </span>
-                <span>traslado terrestre · ~{formatDuration(p.minutos)}</span>
-              </div>
-            ) : (
-              <>
-                <div className="flex items-baseline justify-between gap-3 text-sm">
-                  <span className="font-mono text-white">
-                    {p.de} → {p.para}
-                  </span>
-                  <span className="text-zinc-500">
-                    ~{formatDuration(p.minutos)} · {p.km.toLocaleString('pt-BR')} km
-                  </span>
-                </div>
-                <div className="mt-0.5 flex flex-wrap gap-x-2 text-xs text-zinc-500">
-                  {p.companhias.slice(0, 6).map((c) => (
-                    <span key={c} style={{ color: corDaCompanhia(c) }}>
-                      {nomeDaCompanhia(c)}
-                    </span>
-                  ))}
-                  {p.companhias.length > 6 && <span>+{p.companhias.length - 6}</span>}
-                </div>
-              </>
-            )}
+              ))}
+              {p.companhias.length > 6 && <span>+{p.companhias.length - 6}</span>}
+            </div>
           </li>
         ))}
       </ol>

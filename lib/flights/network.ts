@@ -80,20 +80,12 @@ export function aeroportosDaCidade(iata: string): string[] {
   return grupo ? [...grupo] : [iata];
 }
 
-/** Outros aeroportos da mesma cidade, alcançáveis por traslado terrestre. */
-function irmaosDeMetro(iata: string): string[] {
-  const grupo = aeroportosDoMetro.get(metroPorAeroporto.get(iata) ?? '');
-  return grupo ? grupo.filter((x) => x !== iata) : [];
-}
-
 // ----------------------------------------------------------- timing
 
 const CONEXAO_DOMESTICA = 60;
 const CONEXAO_INTERNACIONAL = 90;
-/** Trocar de aeroporto na mesma cidade (ex.: GRU→CGH). */
-const TRASLADO_TERRESTRE = 180;
 
-function buffceConexao(anterior: string, atual: string, proximo: string): number {
+function bufferConexao(anterior: string, atual: string, proximo: string): number {
   const a = airportByIata.get(anterior);
   const b = airportByIata.get(atual);
   const c = airportByIata.get(proximo);
@@ -104,31 +96,29 @@ function buffceConexao(anterior: string, atual: string, proximo: string): number
 
 // ---------------------------------------------------------- passos
 
-export type TipoPasso = 'voo' | 'traslado';
-
 export interface Passo {
-  tipo: TipoPasso;
   de: string;
   para: string;
-  /** Companhias no trecho (voo) — vazio em traslado terrestre. */
+  /** Companhias que operam o trecho direto. */
   companhias: string[];
   km: number;
+  /** Tempo do trecho, já somada a espera da conexão anterior. */
   minutos: number;
 }
 
 export interface Itinerario {
+  /** Trechos de voo, em ordem. */
   passos: Passo[];
   origem: string;
   destino: string;
   /** Aeroportos de conexão, na ordem. */
   conexoes: string[];
   voos: number;
-  traslados: number;
   kmTotal: number;
-  /** Voo + esperas de conexão + traslados. */
+  /** Voo + esperas de conexão. */
   minutosTotal: number;
   minutosVoo: number;
-  /** Companhias que sozinhas cobrem todos os voos do itinerário. */
+  /** Companhias que sozinhas cobrem todos os trechos (bilhete único). */
   companhiasUnicas: string[];
   /** Todas as companhias que aparecem, para rotular. */
   companhiasTodas: string[];
@@ -137,28 +127,25 @@ export interface Itinerario {
 }
 
 function montar(passos: Passo[]): Itinerario {
-  const voos = passos.filter((p) => p.tipo === 'voo');
   const conexoes = passos.slice(0, -1).map((p) => p.para);
 
-  const minutosVoo = voos.reduce((s, p) => s + p.minutos, 0);
-  const minutosTotal = passos.reduce((s, p) => s + p.minutos, 0);
+  const minutosVoo = passos.reduce((s, p) => s + p.minutos, 0);
   const kmTotal = passos.reduce((s, p) => s + p.km, 0);
 
-  const companhiasUnicas = voos
+  const companhiasUnicas = passos
     .slice(1)
-    .reduce((comuns, p) => comuns.filter((c) => p.companhias.includes(c)), [...voos[0].companhias]);
+    .reduce((comuns, p) => comuns.filter((c) => p.companhias.includes(c)), [...passos[0].companhias]);
 
-  const companhiasTodas = [...new Set(voos.flatMap((p) => p.companhias))];
+  const companhiasTodas = [...new Set(passos.flatMap((p) => p.companhias))];
 
   return {
     passos,
     origem: passos[0].de,
     destino: passos[passos.length - 1].para,
     conexoes,
-    voos: voos.length,
-    traslados: passos.filter((p) => p.tipo === 'traslado').length,
+    voos: passos.length,
     kmTotal,
-    minutosTotal,
+    minutosTotal: minutosVoo,
     minutosVoo,
     companhiasUnicas,
     companhiasTodas,
@@ -174,8 +161,6 @@ export interface BuscaCriativaOpts {
   destinos: string[];
   /** Máximo de voos no itinerário (1 = direto). Padrão 3. */
   maxVoos?: number;
-  /** Permitir um traslado terrestre entre aeroportos da mesma cidade. */
-  permitirTraslado?: boolean;
   /** Teto de desvio sobre a distância direta, para podar absurdos. */
   desvioMaximo?: number;
   limite?: number;
@@ -191,7 +176,6 @@ export function buscarCriativo(opts: BuscaCriativaOpts): Itinerario[] {
     origem,
     destinos,
     maxVoos = 3,
-    permitirTraslado = true,
     desvioMaximo = 2.6,
     limite = 40,
   } = opts;
@@ -225,63 +209,41 @@ export function buscarCriativo(opts: BuscaCriativaOpts): Itinerario[] {
     }
   };
 
-  const explorar = (atual: string, passos: Passo[], trasladoUsado: boolean) => {
-    const voosFeitos = passos.filter((p) => p.tipo === 'voo').length;
-
-    // Chegou? (não conta traslado como último passo útil)
-    if (passos.length > 0 && alvo.has(atual) && passos[passos.length - 1].tipo === 'voo') {
+  const explorar = (atual: string, passos: Passo[]) => {
+    // Chegou a um aeroporto do alvo por voo.
+    if (passos.length > 0 && alvo.has(atual)) {
       registrar([...passos]);
-      // não retorna: pode haver caminho mais longo até outro aeroporto do alvo,
-      // mas evitamos seguir a partir de um destino já alcançado
+      // Não segue a partir de um destino já alcançado.
       return;
     }
 
-    if (voosFeitos >= maxVoos) return;
+    if (passos.length >= maxVoos) return;
 
-    // Voos diretos a partir de `atual`.
     for (const aresta of adjacencia.get(atual) ?? []) {
       if (visitados.has(aresta.para)) continue;
       const metro = metroPorAeroporto.get(aresta.para) ?? aresta.para;
-      // Não revisita a mesma cidade, exceto se for o alvo.
+      // Não passa duas vezes pela mesma cidade, exceto se ela for o alvo.
       if (metrosVisitados.has(metro) && !alvo.has(aresta.para)) continue;
 
       const passo: Passo = {
-        tipo: 'voo',
         de: atual,
         para: aresta.para,
         companhias: aresta.companhias,
         km: aresta.km,
-        minutos: aresta.minutos + (passos.length > 0 ? buffceConexao(passos[passos.length - 1].de, atual, aresta.para) : 0),
+        minutos:
+          aresta.minutos +
+          (passos.length > 0 ? bufferConexao(passos[passos.length - 1].de, atual, aresta.para) : 0),
       };
 
       visitados.add(aresta.para);
       metrosVisitados.add(metro);
-      explorar(aresta.para, [...passos, passo], trasladoUsado);
+      explorar(aresta.para, [...passos, passo]);
       visitados.delete(aresta.para);
       metrosVisitados.delete(metro);
     }
-
-    // Traslado terrestre para outro aeroporto da mesma cidade (uma vez só, e
-    // não como primeiro passo). Abre rotas como ...→GRU (terra)→CGH→CGB.
-    if (permitirTraslado && !trasladoUsado && passos.length > 0) {
-      for (const irmao of irmaosDeMetro(atual)) {
-        if (visitados.has(irmao)) continue;
-        const passo: Passo = {
-          tipo: 'traslado',
-          de: atual,
-          para: irmao,
-          companhias: [],
-          km: 0,
-          minutos: TRASLADO_TERRESTRE,
-        };
-        visitados.add(irmao);
-        explorar(irmao, [...passos, passo], true);
-        visitados.delete(irmao);
-      }
-    }
   };
 
-  explorar(origem, [], false);
+  explorar(origem, []);
 
   return [...melhorPorAssinatura.values()]
     .sort((a, b) => a.minutosTotal - b.minutosTotal || a.voos - b.voos || a.kmTotal - b.kmTotal)

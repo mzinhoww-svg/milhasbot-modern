@@ -18,8 +18,8 @@ import { chegadaLocal, parseHourMinute } from '@/lib/flights/time';
  * nem de rede. Devolve várias opções diversas, não só o caminho mais curto,
  * porque o valor para viagem de staff é ter alternativas quando o voo enche.
  *
- * Horários são estimados por distância + tempos de conexão/traslado, e vêm
- * marcados como estimativa na resposta.
+ * Só voos — nada de traslado terrestre. Horários são estimados por distância +
+ * tempos de conexão, e vêm marcados como estimativa na resposta.
  */
 
 function parseAlvo(bruto: string | null): Alvo | null {
@@ -57,7 +57,6 @@ export async function GET(request: Request) {
   }
 
   const maxVoos = Math.min(Math.max(Number(params.get('maxVoos') ?? 3), 1), 3);
-  const permitirTraslado = params.get('traslado') !== '0';
   const partidaMin = parseHourMinute(params.get('partida') ?? '') ?? 6 * 60;
   const chegarAte = parseHourMinute(params.get('chegarAte') ?? '');
 
@@ -72,7 +71,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ erro: 'Nenhum aeroporto corresponde ao alvo.' }, { status: 400 });
   }
 
-  const itinerarios = buscarCriativo({ origem, destinos, maxVoos, permitirTraslado, limite: 40 });
+  const itinerarios = buscarCriativo({ origem, destinos, maxVoos, limite: 40 });
 
   // Estimativa de chegada a partir da partida informada e do tempo estimado.
   const hoje = new Date();
